@@ -36,6 +36,9 @@ html,body{height:100%;margin:0;background:var(--ground);color:var(--ink);font-fa
 #skillmodal .skbox.enemy{border-color:rgba(226,96,59,.45);background:rgba(40,16,14,.82)}
 #skbadge{display:none;position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:var(--shu)}
 #skbadge.on{display:block}
+#hud .seas{font-weight:700}
+#hud .seas.wet{color:#8fd0ff}
+#hud .seas.dry{color:#f2c27a}
 #hud h1{margin:0;font-family:var(--font-d);font-weight:700;font-size:26px;letter-spacing:.12em;text-shadow:0 1px 12px rgba(0,0,0,.55)}
 #clock{font-size:13px;color:var(--ink);opacity:.9;font-variant-numeric:tabular-nums;text-shadow:0 1px 8px rgba(0,0,0,.6)}
 #clock b{font-family:var(--font-d);font-size:17px;font-weight:600;margin-right:6px}
@@ -1295,7 +1298,7 @@ const P={
   fishCount:40, startSize:1, startFec:20,
   varieties:new Set(['wakin','ryukin','tancho','demekin','shubunkin','comet','yamabuki']),
   fishSize:.6, fishSpeed:1, school:.3, rare:.15,
-  land:2, anacharis:6, lotus:3, weasel:1, fluke:1, frogs:1, crabs:1, moles:1, cats:1, dogs:1, crows:1, crowAggro:0, heronBeam:1, greatDry:1, greatFlood:1, waves:1, ants:1, cray:1, bass:1, gcarrier:1, humans:1, humanRelease:1, protect:1, river:true, drought:1, hera:1, floods:1, highwater:1, croc:1, crocBattle:1, crocBear:1, zooAllies:1, hunter:1, smoking:1, fire:1, poacher:1, toastMode:'always', topicStyle:'random', fruitTree:true, nutTree:true, duckweed:5, reeds:4, flowers:14, berries:4, mushrooms:true, plantRepro:2, rain:'auto', eco:true, birds:1, parasite:1, insects:1, feeder:1, ecoSpeed:1.5, mutation:1, cap:140,
+  land:2, anacharis:6, lotus:3, weasel:1, fluke:1, frogs:1, crabs:1, moles:1, cats:1, dogs:1, crows:1, crowAggro:0, jelly:1, randomTopics:1, crowThrow:1, moleBoom:1, heronBeam:1, greatDry:1, greatFlood:1, waves:1, ants:1, cray:1, bass:1, gcarrier:1, humans:1, humanRelease:1, protect:1, river:true, drought:1, hera:1, floods:1, highwater:1, croc:1, crocBattle:1, crocBear:1, zooAllies:1, hunter:1, smoking:1, fire:1, poacher:1, toastMode:'always', topicStyle:'random', fruitTree:true, nutTree:true, duckweed:5, reeds:4, flowers:14, berries:4, mushrooms:true, plantRepro:2, rain:'auto', eco:true, birds:1, parasite:1, insects:1, feeder:1, ecoSpeed:1.5, mutation:1, cap:140,
   c_base:'#e8452c', c_spot:'#fbf3e8', c_spotAmt:.45, c_tail:'double',
   pondW:2.4, pondL:1.6, pondD:.7,
   water:'clear', clarity:.72, waves:.7,
@@ -3024,6 +3027,7 @@ function startBirdArrive(){
 }
 function birdLeave(){
   if(BIRD.st==='away'||BIRD.st==='leave'||BIRD.st==='dying')return;
+  if(BIRD.grounded>0){logEvent('撃ち落とされたアオサギは、飛んで逃げることができません','herongrounded');return;}
   BIRD.to=new THREE.Vector3(BIRD.pos.x+R(-3,3),3.6,BIRD.pos.z-6);BIRD.from=BIRD.pos.clone();BIRD.st='leave';BIRD.t=0;
 }
 function birdReach(f){
@@ -3718,7 +3722,7 @@ function updateMoles(dt){
     if(m.tgt){
       const dx=m.tgt.x-m.x,dy=m.tgt.y-m.y,dz=m.tgt.z-m.z,d=Math.hypot(dx,dy,dz);
       if(d<.02){
-        if(m.tgt.grub&&MOLE.grubs.includes(m.tgt.grub)){scene.remove(m.tgt.grub.m);MOLE.grubs.splice(MOLE.grubs.indexOf(m.tgt.grub),1);m.energy=Math.min(1,m.energy+.25*(1+.15*skLv('mole','atk')));logEvent('モグラが地虫を食べました','moleeat','土の中にも、小さな生き物の暮らしがあります');}
+        if(m.tgt.grub&&MOLE.grubs.includes(m.tgt.grub)){scene.remove(m.tgt.grub.m);MOLE.grubs.splice(MOLE.grubs.indexOf(m.tgt.grub),1);m.energy=Math.min(1,m.energy+.25*(1+.15*skLv('mole','atk')));logEvent('モグラが地虫を食べました','moleeat','土の中にも、小さな生き物の暮らしがあります');if(rng()<.04)moleInfect(m,'grub');}
         if(m.tgt.surface){
           makeHill(m.x,m.z);const lz=Math.min(m.z,P.pondL/2-.08);
           if(onBank(m.x,lz)&&!isWet3(m.x,m.y,m.z)&&rng()<.55){m.land=true;m.state='land';m.hidden=false;m.hx=m.x;m.hz=lz;m.pos.set(m.x,.03,lz);m.landT=R(12,25);m.yaw=R(0,6.28);m.wp=null;logEvent('モグラが地上に出てきました','moleup','地上では虫を食べますが、猫やアオサギ、強い陸の個体に狙われます');}
@@ -3878,6 +3882,7 @@ function buildDog(){
 const PET={cat:{st:'away',t:45,pos:new THREE.Vector3(),yaw:0,g:null,run:0},dog:{st:'away',t:80,pos:new THREE.Vector3(),yaw:0,g:null,run:0}};
 function petInterval(k){const st=(k==='cat'?PET.cat:PET.dog).strays||0;return (k==='cat'?([Infinity,70,30][P.cats]||Infinity):([Infinity,90,40][P.dogs]||Infinity))/(1+.35*st);}
 function petMove(p,tx,tz,spd,dt){
+  spd*=venomSpd(p);
   const dx=tx-p.pos.x,dz=tz-p.pos.z,d=Math.hypot(dx,dz);if(d<1e-3)return d;
   const sw=inPond(p.pos.x,p.pos.z),s=Math.min(d,spd*dt*(sw?(p===PET.cat?.4:.6):mudF(p.pos))*Math.sqrt(p.size||1));let nx=p.pos.x+dx/d*s,nz=p.pos.z+dz/d*s;
   if(!walkable(nx,nz)){const a=Math.atan2(dx,dz)+1.2;nx=p.pos.x+Math.sin(a)*s;nz=p.pos.z+Math.cos(a)*s;}
@@ -4144,7 +4149,7 @@ function initRain(){
   for(let i=0;i<RAIN.N;i++)respawnDrop(i,true);
 }
 function applyWaterLevel(){
-  const wy=-.05-FLOOD.drop+RAIN.rise-DRY.drop-(typeof GREAT!=='undefined'&&GREAT?GREAT.dryDrop:0)+Math.max(FLOODEV.rise,HIGHW.rise,typeof GREAT!=='undefined'&&GREAT?GREAT.floodRise:0);U.uWaterY.value=wy;
+  const wy=-.05-FLOOD.drop+RAIN.rise-DRY.drop-(typeof SEAS!=='undefined'?SEAS.dry:0)-(typeof GREAT!=='undefined'&&GREAT?GREAT.dryDrop:0)+Math.max(FLOODEV.rise,HIGHW.rise,typeof GREAT!=='undefined'&&GREAT?GREAT.floodRise:0);U.uWaterY.value=wy;
   if(ENV.surface)ENV.surface.position.y=wy;
   if(ENV.waterBox){const D=P.pondD;ENV.waterBox.scale.y=(D+wy)/(D-.05);ENV.waterBox.position.y=(-D+wy)/2;}
   bounds.maxY=wy-.06;
@@ -4156,14 +4161,17 @@ function floodRescan(){
   for(let k=0;k<FLOOD.wet.length;k++){if(!FLOOD.wet[k])continue;const i=k%n,j=(k/n)|0;
     for(const [a,b] of [[i,j+1],[i-1,j],[i+1,j]]){if(a<0||b<0||a>=n||b>=FLOOD.ny)continue;const kk=b*n+a;if(FLOOD.dug[kk]&&!FLOOD.wet[kk])FLOOD.frontier.push(kk);}}
 }
+// 季節：乾季（渇水期）と雨季（増水期）をはっきりくり返す
+var SEAS={len:280,dryLen:160,dry:0};
+function seasonInfo(){const c=RAIN.t%SEAS.len,wet=c>=SEAS.dryLen,left=wet?SEAS.len-c:SEAS.dryLen-c;const sec=left/Math.max(.01,P.ecoSpeed),day=P.autoTime?24/Math.max(.01,P.timeSpeed*.25):96/Math.max(.01,P.ecoSpeed);const d=sec/day;return {wet,left,days:Math.max(1,Math.round(d)),txt:d>=1.5?'あと約'+Math.round(d)+'日':'あと約'+Math.max(1,Math.round(d*24))+'時間'};}   // 残り日数（ゲーム内の1日の長さで換算）
 function updateRain(dt){
   const ed=dt*P.ecoSpeed;
   if(P.rain==='auto'){
-    RAIN.t+=ed;const cyc=RAIN.t%260,rainy=cyc>170;
+    RAIN.t+=ed;const cyc=RAIN.t%SEAS.len,rainy=cyc>=SEAS.dryLen;
     if(rainy!==(RAIN.season==='rainy')){
       RAIN.season=rainy?'rainy':'dry';
-      if(rainy){delete ECO.flags.rainy;logEvent('雨季に入りました','rainy','雨で池の水かさが増し、水草やカエル、新しい木が育ちやすくなります');}
-      else{delete ECO.flags.dry;logEvent('乾季になりました','dry','雨が上がり、池の水は少しずつ蒸発していきます');}
+      if(rainy){delete ECO.flags.rainy;logEvent('雨季（増水期）に入りました：これから水かさが増えていきます','rainy','雨季のあいだは雨が続き、池の水があふれやすくなります。洪水や増水期もこの時期に起こります');}
+      else{delete ECO.flags.dry;HIGHW.active=false;if(!(typeof GREAT!=='undefined'&&GREAT.flood))FLOODEV.active=false;logEvent('乾季（渇水期）に入りました：これから水が減っていきます','dry','雨がやみ、池の水はどんどん蒸発していきます。乾季の終わりごろには、ふだんより水位が下がります。日照りもこの時期に起こります');}
     }
     RAIN.target=rainy?.55+.45*Math.max(0,Math.sin(RAIN.t*.09)):(Math.sin(RAIN.t*.045)>.96?.35:0);
   }else if(P.rain==='on'){RAIN.target=1;if(RAIN.season!=='rainy'){RAIN.season='rainy';logEvent('雨季に入りました','rainy','雨で池の水かさが増し、水草やカエル、新しい木が育ちやすくなります');}}
@@ -4171,7 +4179,10 @@ function updateRain(dt){
   RAIN.amt+=(RAIN.target-RAIN.amt)*Math.min(1,dt*.35);
   const a=RAIN.amt;
   // 水かさ：雨で増え、晴れると少しずつ蒸発する
-  if(a>.05)RAIN.rise=Math.min(.09,RAIN.rise+ed*.0008*a);else RAIN.rise=Math.max(0,RAIN.rise-ed*.00018);
+  const wet=RAIN.season==='rainy';
+  if(wet&&a>.05)RAIN.rise=Math.min(.09,RAIN.rise+ed*.0012*a);else if(!wet)RAIN.rise=Math.max(0,RAIN.rise-ed*.0015);else RAIN.rise=Math.max(0,RAIN.rise-ed*.0003);
+  // 渇水：乾季のあいだはどんどん水が引き、雨季になると戻る
+  if(P.rain==='auto'||P.rain==='off'){if(wet)SEAS.dry=Math.max(0,SEAS.dry-ed*.006);else if(RAIN.rise<=0)SEAS.dry=Math.min(P.pondD*.3,SEAS.dry+ed*.0022);}else SEAS.dry=Math.max(0,SEAS.dry-ed*.006);
   if(FLOOD.drop>0&&a>.1)FLOOD.drop=Math.max(0,FLOOD.drop-ed*.0006*a);
   applyWaterLevel();
   if(RAIN.rise>.02)logEvent('池の水かさが増しています','rise','水面が上がり、岸のすぐ下まで水が来ています');
@@ -4265,7 +4276,7 @@ function updateMoleLand(m,dt,ed){
   const L=P.pondL;m.landT-=dt;
   let tx,tz,spd=.06;
   const th=critThreat(m)+(MOLE.list&&fishes.some(f=>f.lprey===m)?.5:0);
-  if(m.landT<=0||th>.3||m.energy>.95){
+  if(!m.para&&(m.landT<=0||th>.3||m.energy>.95)){   // 寄生虫に感染したモグラは地中へ戻らない
     tx=m.hx;tz=m.hz!==undefined?m.hz:L/2-.08;spd=th>.3?.14:.07;
     if(Math.hypot(tx-m.pos.x,tz-m.pos.z)<.03){m.land=false;m.state='under';m.hidden=true;m.x=m.hx;m.y=-.05;m.z=clamp(tz,MOLE.rect.z-MOLE.rect.depth+.03,MOLE.rect.z-.03);m.lp.set(m.x,m.y,m.z);m.tgt=null;paintTunnel(m.x,m.y,.035,m.z);return;}
   }else{
@@ -4363,6 +4374,8 @@ function crowsLeave(){CROWS.st='leave';for(const c of CROWS.list)c.leaving=true;
 function crowFlee(c){c.leaving=true;c.fleeTo=new THREE.Vector3(c.pos.x+R(-3,3),3.5,c.pos.z-5);}
 function crowTarget(){
   const cx=CROWS.center.x,cz=CROWS.center.z;let best=null,bd=3;
+  // 寄生虫にあやつられて地上をさまようモグラは、真っ先に狙われる
+  {const im=MOLE.list.find(m=>m.land&&m.para&&Math.hypot(m.pos.x-cx,m.pos.z-cz)<4);if(im)return {obj:im,p:im.pos,kind:'crit'};}
   const tryT=(obj,p,kind)=>{const d=Math.hypot(p.x-cx,p.z-cz);if(d<bd){bd=d;best={obj,p,kind};}};
   for(const f of fishes){if(f.gone)continue;if(f.state==='land'&&!f.covered&&!f.inBurrow&&!f.jump)tryT(f,f.pos,'fish');else if(f.state==='dead'&&f.deadOnLand)tryT(f,f.pos,'dead');}
   for(const o of landPrey())if(!o.hidden)tryT(o,o.pos,'crit');
@@ -4375,6 +4388,7 @@ function crowTarget(){
 function crowPower(){const n=CROWS.list.filter(c=>!c.leaving).length;return n*(1+.1*skLv('crow','atk'))*(1+.12*skLv('crow','hp'))*(1+.15*skLv('crow','uniq'))*(BTL.team?1.2:1);}
 const CROW_FOE_NM={cat:'猫',dog:'犬',weasel:'イタチ',heron:'アオサギ',human:'人間',fish:'陸の金魚',wfish:'水面の金魚',crit:'小さな生き物',dead:'金魚の亡きがら'};
 function crowAggroTarget(){
+  if(CROWS.list.every(c=>c.grounded>0))return null;
   const pw=crowPower(),cx=CROWS.center.x,cz=CROWS.center.z,wy=U.uWaterY.value;let best=null,bd=6;
   const tryA=(obj,p,kind,str,mob)=>{if(str>=pw)return;const d=Math.hypot(p.x-cx,p.z-cz);if(d<bd){bd=d;best={obj,p,kind,mob,str};}};
   if(PET.cat.g&&PET.cat.g.visible&&!['away','leave'].includes(PET.cat.st))tryA(PET.cat,PET.cat.pos,'cat',3*(PET.cat.size||1),true);
@@ -4443,6 +4457,13 @@ function updateCrows(dt){
   const tgP=CROWS.target?CROWS.target.p:null,n=Math.max(1,act.length);
   for(let i=CROWS.list.length-1;i>=0;i--){
     const c=CROWS.list[i];c.flap+=dt*16;
+    if(c.grounded>0){
+      c.grounded-=dt;const gy=groundH(c.pos.x,c.pos.z);c.pos.y=Math.max(gy,c.pos.y-dt*1.5);
+      if(c.pos.y<=gy+.001&&rng()<dt*1.5){c.yaw+=R(-1,1);const nx=c.pos.x+Math.sin(c.yaw)*.04,nz=c.pos.z+Math.cos(c.yaw)*.04;if(onBank(nx,nz)){c.pos.x=nx;c.pos.z=nz;}}
+      c.g.position.copy(c.pos);c.g.rotation.y=c.yaw;for(const w of c.g.userData.wings)w.pv.rotation.set(0,w.sg*1.2,-w.sg*.1);
+      if(c.grounded<=0)logEvent('毒が抜けて、カラスがまた飛べるようになりました','crowfly');
+      continue;
+    }
     if(c.stealing||c.fighting){c.g.position.copy(c.pos);c.g.rotation.y=c.yaw;continue;}   // 釣り人の獲物をねらって急降下中
     let des,fly=true,spd=1.3;
     if(c.leaving){
@@ -4459,9 +4480,10 @@ function updateCrows(dt){
       if(r<=.12&&dh<.08&&(c.peck-=dt)<=0&&CROWS.target){
         c.peck=R(.8,1.4);
         const near=act.filter(o=>Math.hypot(o.pos.x-tgP.x,o.pos.z-tgP.z)<.2).length,tg=CROWS.target;
-        let ok=rng()<.12+.12*near;
+        let ok=rng()<(.12+.12*near)*(tg.obj&&tg.obj.para?3:1);
         if(tg.kind==='fish')ok=ok&&rng()<1-.4*tg.obj.g.leg-.3*tg.obj.g.spine;
         if(ok){
+          if(tg.obj&&tg.obj.para)logEvent('カラスが、寄生虫にあやつられたモグラをくわえていきました','crowparamole','あやつられたモグラは、カラスにとって格好の獲物です');
           if(tg.kind==='fish'||tg.kind==='wfish'||tg.kind==='crit')killPrey(tg.obj);else if(tg.kind==='egg')eatEgg(tg.obj);else if(tg.kind==='nut')eatGroundNut(tg.obj);else if(tg.kind==='berry'){const fr=tg.obj.fruits.find(q=>q.m.visible&&q.ripe>=1);if(fr){fr.m.visible=false;fr.ripe=0;}if(rng()<.6&&lpCount('berry')<lpCap('berry')){const q=landPlantSpot(null);if(q){addLandPlant('berry',q.x,q.z);logEvent('カラスが運んだ種から野イチゴが芽を出しました','crowseed','鳥は実を食べて、遠くへ種を運びます');}}}else if(tg.kind==='dead')tg.obj.deadT+=3;
           CROWS.meals++;CROWS.target=null;CROWS.st='circle';
           logEvent(tg.kind==='wfish'?'カラスの群れが水面の金魚をつかみ上げました':tg.kind==='fish'?'カラスの群れが陸の個体を取り囲んで仕留めました':tg.kind==='egg'?'カラスの群れが陸の卵を奪いました':'カラスの群れが獲物をついばみました','crowkill','群れは獲物を四方から囲んで、逃げ道をふさぎます');
@@ -5078,7 +5100,7 @@ function updateStumps(dt){
   }
 }
 function humanWalk(to,dt,spd,H=HUMAN){
-  spd*=mudF(H.pos)*(HK.gear.clothes?1.3:1)*(inPond(H.pos.x,H.pos.z)&&!H.boat&&!H.diving?.4:1);v1.set(to.x-H.pos.x,0,to.z-H.pos.z);const d=v1.length();
+  spd*=mudF(H.pos)*(HK.gear.clothes?1.3:1)*(inPond(H.pos.x,H.pos.z)&&!H.boat&&!H.diving?.4:1)*venomSpd(H);v1.set(to.x-H.pos.x,0,to.z-H.pos.z);const d=v1.length();
   if(d>.01){const s=Math.min(d,spd*dt);v1.normalize();
     let nx=H.pos.x+v1.x*s,nz=H.pos.z+v1.z*s;
     if(H.st==='battle'&&!H.boat&&!H.diving&&!inPond(H.pos.x,H.pos.z)&&inPond(nx,nz)){
@@ -5091,7 +5113,7 @@ function updateHuman(dt){
   const H=HUMAN;updateStumps(dt);
   if(H.felling){
     const fl=H.felling;fl.k=Math.min(1,fl.k+dt*(.25+fl.k*1.6));
-    fl.t.g.quaternion.copy(fl.q0);fl.t.g.rotateOnWorldAxis(fl.axis,fl.k*1.5);
+    fl.t.g.quaternion.copy(fl.q0);fl.t.g.rotateOnWorldAxis(fl.axis,fl.k*1.5);if(fl.k<1)treeCrush(fl.t.g,fl.t.pos);
     if(fl.k>=1&&(fl.hold-=dt)<0){emitSparkles(new THREE.Vector3(fl.t.pos.x+fl.dir.x*.6,.05,fl.t.pos.z+fl.dir.z*.6),20,.2,'dirt');finishFelling();}
   }
   if(H.st==='away'){
@@ -5201,7 +5223,9 @@ function updatePerson(H,dt){
   // 近くにいる生き物の反応
   if((H.scareT=(H.scareT||0)-dt)<0){
     H.scareT=.5;
-    if(heron&&(BIRD.st==='stand'||BIRD.st==='wade')&&Math.hypot(BIRD.pos.x-H.pos.x,BIRD.pos.z-H.pos.z)<1.4){birdLeave();logEvent('アオサギが人間を警戒して飛び去りました','heronhuman');}
+    // レーザースキルを身につけたアオサギは、人間が近づいてもおびえない
+    if(heron&&(BIRD.st==='stand'||BIRD.st==='wade')&&skLv('heron','sweep')>0&&Math.hypot(BIRD.pos.x-H.pos.x,BIRD.pos.z-H.pos.z)<1.4)logEvent('レーザーを身につけたアオサギは、人間が近づいても少しもおびえません','heronbrave','スキル「ロングレーザー薙ぎ払い」を得たアオサギは自信をつけ、人のそばでも堂々と立っています');
+    else if(heron&&(BIRD.st==='stand'||BIRD.st==='wade')&&Math.hypot(BIRD.pos.x-H.pos.x,BIRD.pos.z-H.pos.z)<1.4){birdLeave();logEvent('アオサギが人間を警戒して飛び去りました','heronhuman');}
     if(WEASEL.st==='hunt'&&Math.hypot(WEASEL.pos.x-H.pos.x,WEASEL.pos.z-H.pos.z)<1){weaselLeave();}
     for(const f of fishes){if(f.gone||f.state!=='land')continue;if(Math.hypot(f.pos.x-H.pos.x,f.pos.z-H.pos.z)<.5&&!(f.carry&&f.carry.type==='stone'&&f.g.wit>.35))f.fearT=Math.max(f.fearT,2);}
   }
@@ -5227,6 +5251,7 @@ function updatePerson(H,dt){
   if(u.log.visible){a0=-2.9;e0=-1.6;}
   if(u.basket.visible&&pose!=='reach')e1=-1.2;
   arm0.sh.rotation.x=a0;arm1.sh.rotation.x=a1;arm0.el.rotation.x=e0;arm1.el.rotation.x=e1;
+  if(H.recoil>0){H.recoil-=dt;const rk=Math.max(0,H.recoil/.3);arm0.sh.rotation.x+=.55*rk;arm1.sh.rotation.x+=.4*rk;arm0.el.rotation.x-=.3*rk;}   // 発射の反動
   if(u.line.visible){
     H.g.updateMatrixWorld(true);u.tip.getWorldPosition(v2);const p=u.line.geometry.attributes.position;
     p.setXYZ(0,v2.x,v2.y,v2.z);p.setXYZ(1,u.bob.position.x,u.bob.position.y,u.bob.position.z);p.needsUpdate=true;
@@ -5609,7 +5634,7 @@ function updateDays(dt){
 function updateDrought(dt){
   const D=P.pondD,maxDrop=D*.55;
   if(!P.eco){return;}
-  if(!DRY.active&&P.drought&&RAIN.amt<.1&&rng()<dt*P.ecoSpeed*.0012*P.drought){DRY.active=true;DRY.len=R(2.5,4);logEvent('日照りが続き、池の水が干上がり始めました','drought','水が減ると魚は狭い場所に押し込められます。長く続くと、陸で生きる道を探す個体が現れます');}
+  if(!DRY.active&&P.drought&&RAIN.season!=='rainy'&&RAIN.amt<.1&&rng()<dt*P.ecoSpeed*.0012*P.drought){DRY.active=true;DRY.len=R(2.5,4);logEvent('日照りが続き、池の水が干上がり始めました','drought','水が減ると魚は狭い場所に押し込められます。長く続くと、陸で生きる道を探す個体が現れます');}
   if(DRY.active){
     DRY.len-=DAYD;DRY.drop=Math.min(maxDrop,DRY.drop+DAYD*maxDrop/1.2);
     if(DRY.len<=0||RAIN.amt>.4){DRY.active=false;logEvent('日照りが終わり、水が戻り始めました','droughtend');}
@@ -5900,11 +5925,11 @@ function updateFloodEvent(dt){
     if(FLOODEV.t<=0){FLOODEV.active=false;logEvent('洪水がおさまり、水が引き始めました','floodevend');statsDirty=true;}
     // 濁流のしぶき
     if((FLOODEV.fxT-=dt)<0&&OVF.spread>0){FLOODEV.fxT=.15;const W=P.pondW,L=P.pondL,M=M_BANK;for(let k=0;k<4;k++){const x=R(-W/2-M,W/2+M),z=R(-L/2-M,L/2);if(overflowAt(x,z)){emitSparkles(v1.set(x,U.uWaterY.value,z),2,.06,'bubble');if(rng()<.3)addRipple(x,z,.8);}}}
-  }else if(FLOODEV.rise>0)FLOODEV.rise=Math.max(0,FLOODEV.rise-ed*.01);
+  }else if(FLOODEV.rise>0)FLOODEV.rise=Math.max(0,FLOODEV.rise-ed*(RAIN.season==='rainy'?.01:.03));
   // 増水期：雨季のあいだ、しばらく水位が洪水並みに高いまま続く（流れはおだやか）
   if(!HIGHW.active&&P.highwater&&P.eco&&RAIN.season==='rainy'&&rng()<ed*.0008*P.highwater)startHighWater();
   if(HIGHW.active){HIGHW.len-=DAYD;HIGHW.rise=Math.min(.36,HIGHW.rise+ed*.004);if(HIGHW.len<=0){HIGHW.active=false;logEvent('増水期が終わり、水位が下がり始めました','highwaterend');statsDirty=true;}}
-  else if(HIGHW.rise>0)HIGHW.rise=Math.max(0,HIGHW.rise-ed*.003);
+  else if(HIGHW.rise>0)HIGHW.rise=Math.max(0,HIGHW.rise-ed*(RAIN.season==='rainy'?.003:.02));
   if(FLOODEV.active||FLOODEV.rise>0||HIGHW.rise>0)applyWaterLevel();
   updateFloodWalls();
 }
@@ -6205,6 +6230,7 @@ function crocKill(c,t){
   addRipple(c.pos.x,c.pos.z,1.8);emitSparkles(v1.set(c.pos.x,U.uWaterY.value,c.pos.z),24,.12,'bubble');ECO.crocKills=(ECO.crocKills||0)+1;statsDirty=true;
 }
 function crocMove(c,tx,tz,spd,dt){
+  spd*=venomSpd(c);
   const dx=tx-c.pos.x,dz=tz-c.pos.z,d=Math.hypot(dx,dz);if(d<.01)return d;
   const s=Math.min(d,spd*dt*(inWaterAt(c.pos.x,c.pos.z)?1:mudF(c.pos)));c.pos.x+=dx/d*s;c.pos.z+=dz/d*s;if(!inWaterAt(c.pos.x,c.pos.z))treeBlock(c.pos,.06*c.len);
   let dy=Math.atan2(dx,dz)-c.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));c.yaw+=dy*Math.min(1,dt*3);c.walk+=s*25/c.len;return d;
@@ -6441,7 +6467,7 @@ function updateBeast(B,dt){
   if(B.state==='dead'){updateDeadBeast(B,dt);return;}
   const S=B.S;B.flash=Math.max(0,B.flash-dt);B.atk=Math.max(0,B.atk-dt);
   let moving=false;
-  const walkTo=(x,z,spd)=>{if(inPond(x,z)){const e=nearestPondEdge({x,z});x=e.x;z=e.z;}spd*=(inPond(B.pos.x,B.pos.z)?.4:mudF(B.pos))*(B.skSpd||1);const dx=x-B.pos.x,dz=z-B.pos.z,d=Math.hypot(dx,dz);if(d>.02){const s=Math.min(d,spd*dt);B.pos.x+=dx/d*s;B.pos.z+=dz/d*s;treeBlock(B.pos,.06*B.S.scale*(B.sz||1));let dy=Math.atan2(dx,dz)-B.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));B.yaw+=dy*Math.min(1,dt*4);B.walk+=s*20/S.scale;moving=true;}return d;};
+  const walkTo=(x,z,spd)=>{if(inPond(x,z)){const e=nearestPondEdge({x,z});x=e.x;z=e.z;}spd*=(inPond(B.pos.x,B.pos.z)?.4:mudF(B.pos))*(B.skSpd||1)*venomSpd(B);const dx=x-B.pos.x,dz=z-B.pos.z,d=Math.hypot(dx,dz);if(d>.02){const s=Math.min(d,spd*dt);B.pos.x+=dx/d*s;B.pos.z+=dz/d*s;treeBlock(B.pos,.06*B.S.scale*(B.sz||1));let dy=Math.atan2(dx,dz)-B.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));B.yaw+=dy*Math.min(1,dt*4);B.walk+=s*20/S.scale;moving=true;}return d;};
   if(B.state==='leave'&&B.hp<=0){beastDie(B);return;}
   if(B.state==='leave'){if(walkTo(B.exit.x,B.exit.z,S.spd+.15)<.06){skGain(B.type,30,'safe');scene.remove(B.g);BTL.zoo.splice(BTL.zoo.indexOf(B),1);if(BTL.bear===B)BTL.bear=null;statsDirty=true;return;}}
   else{
@@ -6539,12 +6565,43 @@ function summonHunter(caller){
   logEvent(who+'が、猟師を呼んできました！'+(HUNT.list.length>1?'（猟師'+HUNT.list.length+'人目）':''),HUNT.list.length>1?'hunter'+HUNT.list.length:'hunter','猟師は敵からいちばん遠い隅にやぐらを組み、超長距離から狙撃します。ただし、流れ弾が味方に当たることも……');statsDirty=true;
 }
 // 猟銃を撃つ：外れた弾が、射線の近くにいる味方に当たることがある
+// 射線上のクラゲを一掃する（弾は射線の先まで突き抜ける）
+function jellyOnLine(a,b){
+  const d=new THREE.Vector3().subVectors(b,a),L=d.length();if(L<1e-3)return [];d.divideScalar(L);
+  const out=[];for(const J of JELLY.list){const v=new THREE.Vector3().subVectors(J.pos,a),t=v.dot(d);if(t<0)continue;const q=a.clone().addScaledVector(d,t);if(q.distanceTo(J.pos)<.22)out.push(J);}
+  return out;
+}
+function jellySnipe(a,b,aimed){
+  const end=a.clone().addScaledVector(new THREE.Vector3().subVectors(b,a).normalize(),7);
+  const line=jellyOnLine(a,end);if(!line.length)return 0;
+  const hit=line.filter(J=>!jellyFront(J,a));for(const J of line)if(!hit.includes(J))jellyDodge(J,a,'弾');
+  if(!hit.length)return 0;
+  for(const J of hit){emitSparkles(J.pos.clone(),24,.1,'bubble');jellyPop(J);JELLY.list.splice(JELLY.list.indexOf(J),1);skGain('jelly',40,'death');}
+  JELLY.stings=JELLY.stings.filter(S=>{if(JELLY.list.includes(S.J))return true;scene.remove(S.line);return false;});
+  skGain('human',25*hit.length,'kill');
+  logEvent(hit.length>1?'猟師の一発の狙撃が、射線上のクラゲ'+hit.length+'匹をまとめて撃ち抜き、一掃しました！':'猟師の狙撃がクラゲを撃ち抜きました！','jellysnipe'+(hit.length>1?'m':''),'クラゲの体はやわらかく、猟銃の弾は突き抜けて、射線上に並んだクラゲをまとめて落とします');
+  return hit.length;
+}
+// クラゲが一列に並んでいたら、そこをねらう
+function jellyAim(mz){
+  if(JELLY.list.length<2||rng()>.6)return null;
+  let best=null,bn=1;
+  for(const J of JELLY.list){const end=mz.clone().addScaledVector(new THREE.Vector3().subVectors(J.pos,mz).normalize(),7);const n=jellyOnLine(mz,end).length;if(n>bn){bn=n;best=J.pos.clone();}}
+  return best;
+}
 function hunterShoot(F,E,dist=0){
   const H=F.o,u=H.g.userData;H.g.updateMatrixWorld(true);H.muzzle.getWorldPosition(v1);
+  const mz=v1.clone(),ja=jellyAim(mz);
+  if(ja){
+    logEvent('猟師が、一列に並んだクラゲにねらいを定めました……','jellyaim');gunFX(H,mz,ja);
+    const n=jellySnipe(mz,ja,true),end=mz.clone().addScaledVector(new THREE.Vector3().subVectors(ja,mz).normalize(),7);
+    const pa=H.tracer.geometry.attributes.position;pa.setXYZ(0,mz.x,mz.y,mz.z);pa.setXYZ(1,end.x,end.y,end.z);pa.needsUpdate=true;H.tracer.visible=true;H.trT=.15;
+    return;
+  }
   const ey=E===BTL.croc?U.uWaterY.value+.04:groundH(E.pos.x,E.pos.z)+.3;
   const hit=rng()<F.S.hit-.03*dist+skSnipe();let to=v2.set(E.pos.x,ey,E.pos.z);
   logEvent('猟師がやぐらの上から狙撃しました（およそ'+(dist*.9).toFixed(1)+'m先）','snipe','スコープで狙いを定め、超長距離から撃ちます。遠いほど当てにくく、射線上の味方に流れ弾が当たることもあります');
-  emitSparkles(v1.clone(),6,.03,'bubble');
+  emitSparkles(v1.clone(),6,.03,'bubble');gunFX(H,v1.clone(),to.clone());
   if(hit){const dmg=R(F.S.dmg[0],F.S.dmg[1])*skFAtk(F);E.hp=Math.max(0,E.hp-skTake(E,dmg));skDealt(F,dmg);E.flash=.3;emitSparkles(to.clone(),10,.08,'dirt');logEvent('猟師の猟銃が命中しました！','huntshot');}
   else{
     // 射線の近く（相手の手前や向こう側）にいる味方を探す
@@ -6554,7 +6611,8 @@ function hunterShoot(F,E,dist=0){
     if(victim&&rng()<.55){const q=fighterPos(victim);to=v2.set(q.x,groundH(q.x,q.z)+.4,q.z);logEvent('流れ弾が'+fname(victim)+'に当たってしまいました！','stray','猟銃の弾は、外れると思わぬところへ飛んでいきます');hurtFighter(victim,R(15,25),null);}
     else{to=v2.set(E.pos.x+R(-.5,.5),ey,E.pos.z+R(-.5,.5));addRipple(to.x,to.z,.8);logEvent('猟師の弾は外れました','huntmiss');}
   }
-  const pa=H.tracer.geometry.attributes.position;pa.setXYZ(0,v1.x,v1.y,v1.z);pa.setXYZ(1,to.x,to.y,to.z);pa.needsUpdate=true;H.tracer.visible=true;H.trT=.08;
+  jellySnipe(mz,to.clone(),false);   // たまたま射線上にいたクラゲも撃ち抜かれる
+  const pa=H.tracer.geometry.attributes.position;pa.setXYZ(0,mz.x,mz.y,mz.z);pa.setXYZ(1,to.x,to.y,to.z);pa.needsUpdate=true;H.tracer.visible=true;H.trT=.08;
 }
 function updateHunters(dt){
   for(const H of HUNT.list.slice()){
@@ -6596,7 +6654,7 @@ function fighterStep(F,dt,c){
     }else{F.aimT=0;H.laserOn=null;}
     F.atk=Math.max(0,(F.atk||0)-dt);return;
   }
-  if(!F.rest&&d<reach&&F.cd<=0&&F.st>=S.cost){
+  if(!F.rest&&d<reach&&F.cd<=0&&F.st>=S.cost&&!(F.o&&F.o.sleepT>0)){
     F.cd=S.cd*R(.85,1.2)*(F.hs?HSTYLE[F.hs].cd:1);F.st-=S.cost;F.atk=.35;
     if(F.hs){const hit=rng()<S.hit;humanStrike(F,E,R(S.dmg[0],S.dmg[1])*(F.pw||1)*skFAtk(F)*HSTYLE[F.hs].dmg,hit,c);}
     else if(rng()<S.hit){const dmg=R(S.dmg[0],S.dmg[1])*(F.pw||1)*skFAtk(F);E.hp=Math.max(0,E.hp-skTake(E,dmg));skDealt(F,dmg);E.flash=.3;emitSparkles(v1.set(E.pos.x,(E===c?U.uWaterY.value:groundH(E.pos.x,E.pos.z)+.2)+.03,E.pos.z),5,.08,'dirt');}
@@ -6646,7 +6704,7 @@ function updateBattle(dt){
     if(F.kind==='heron'&&BIRD.st!=='stand'){releaseFighter(F,false);BTL.f.splice(BTL.f.indexOf(F),1);continue;}
     if(F.kind==='crow'&&(F.o.leaving||F.o.gone)){releaseFighter(F,false);BTL.f.splice(BTL.f.indexOf(F),1);continue;}
     fighterStep(F,dt,c);
-    if(F.kind==='crow'){const k=F.o,E=F.enemy||c||{pos:k.pos};const dive=F.atk>0;v1.set(F.tx,dive?(E===c?U.uWaterY.value+.08:.35):.5+Math.sin(U.uTime.value*2+F.ang)*.1,F.tz);k.pos.lerp(v1,Math.min(1,dt*(dive?6:2)));k.yaw=Math.atan2(E.pos.x-k.pos.x,E.pos.z-k.pos.z);}
+    if(F.kind==='crow'&&!F.o.carrying&&!(F.o.grounded>0)){const k=F.o,E=F.enemy||c||{pos:k.pos};const dive=F.atk>0;v1.set(F.tx,dive?(E===c?U.uWaterY.value+.08:.35):.5+Math.sin(U.uTime.value*2+F.ang)*.1,F.tz);k.pos.lerp(v1,Math.min(1,dt*(dive?6:2)));k.yaw=Math.atan2(E.pos.x-k.pos.x,E.pos.z-k.pos.z);}
     if(F.kind==='heron'){const E=F.enemy||c;if(E){const d=Math.hypot(E.pos.x-BIRD.pos.x,E.pos.z-BIRD.pos.z);if(d<1.4)BIRD.yaw=Math.atan2(E.pos.x-BIRD.pos.x,E.pos.z-BIRD.pos.z);}}
   }
   // ワニの行動：いちばん近い相手にかみつく（撤退後は熊だけが戦う）
@@ -7108,12 +7166,12 @@ function updatePassengers(dt){
   }
 }
 /* ============ スキルツリー（人間・金魚・猫・犬の側）：経験は血統（遺伝子）に受け継がれる ============ */
-const SKT={human:'人間',fish:'金魚',cat:'猫',dog:'犬',crow:'カラス',heron:'アオサギ',ant:'アリ',mole:'モグラ',frog:'カエル',bear:'熊',lion:'ライオン',elephant:'ゾウ',giraffe:'キリン',croc:'ワニ'};
-const SKE={bear:1,lion:1,elephant:1,giraffe:1,croc:1};   // エネミー（敵側）
+const SKT={human:'人間',fish:'金魚',cat:'猫',dog:'犬',crow:'カラス',heron:'アオサギ',ant:'アリ',mole:'モグラ',frog:'カエル',bear:'熊',lion:'ライオン',elephant:'ゾウ',giraffe:'キリン',croc:'ワニ',jelly:'クラゲ'};
+const SKE={bear:1,lion:1,elephant:1,giraffe:1,croc:1,jelly:1};   // エネミー（敵側）
 function skIsEnemy(t){return !!SKE[t];}
 const SKILLS=[
   {id:'hp',tier:1,max:Infinity},{id:'atk',tier:1,max:Infinity},{id:'spd',tier:1,max:Infinity},{id:'eggs',tier:1,max:Infinity,only:'fish'},   // 強化系はポイントがある限り上げられる
-  {id:'drain',tier:2,max:5,req:['atk',2]},{id:'anchor',tier:2,max:5,req:['atk',1],only:'human'},{id:'boat',tier:2,max:5,req:['spd',1],only:'human'},{id:'buster',tier:2,max:5,req:['atk',2],only:'crow'},{id:'sweep',tier:2,max:5,req:['atk',2],only:'heron'},{id:'ally',tier:2,max:3,maxBy:{crow:5},req:['hp',2]},{id:'guard',tier:2,max:5,req:['spd',2]},
+  {id:'drain',tier:2,max:5,req:['atk',2]},{id:'anchor',tier:2,max:5,req:['atk',1],only:'human'},{id:'boat',tier:2,max:5,req:['spd',1],only:'human'},{id:'buster',tier:2,max:5,req:['atk',2],only:'crow'},{id:'sweep',tier:2,max:5,req:['atk',2],only:'heron'},{id:'tent',tier:2,max:5,req:['atk',1],only:'jelly'},{id:'venom',tier:2,max:5,req:['hp',1],only:'jelly'},{id:'ally',tier:2,max:3,maxBy:{crow:5},req:['hp',2]},{id:'guard',tier:2,max:5,req:['spd',2]},
   {id:'uniq',tier:3,max:3,req:'tier2'}
 ];
 // 側ごとのスキル名と効果
@@ -7129,7 +7187,7 @@ const SKN={
   crow:{hp:['体力強化','戦いでの最大体力 +12%／段'],atk:['嘴の力','与えるダメージ +10%／段'],spd:['翼の力','スタミナ回復 +8%／段'],
     drain:['吸収','与えたダメージの6%／段ぶん体力を回復'],ally:['群れ呼び','やって来る群れ +1羽／段（カラスだけ最大5段）'],buster:['ブレーンバスター','敵を高く持ち上げて地面に叩き落とす。ダメージは攻撃力しだい。段が上がるほど高く持ち上げて大ダメージ'],guard:['頑丈','受けるダメージ -7%／段'],uniq:['集団戦法','ダメージがさらに +15%／段']},
   heron:{hp:['体力強化','戦いでの最大体力 +12%／段'],atk:['嘴の鋭さ','与えるダメージ +10%／段'],spd:['翼の力','スタミナ回復 +8%／段'],
-    drain:['吸収','与えたダメージの6%／段ぶん体力を回復'],ally:['呼び声','戦いの中でカラスの群れを呼べる回数 +1／段'],sweep:['ロングレーザー薙ぎ払い','戦いの中で長いレーザーを横に薙ぎ払い、当たった敵すべてにダメージ。通り道に火がつく。段が上がるほど長く・広く・強く・頻繁に'],guard:['頑丈','受けるダメージ -7%／段'],uniq:['一撃の嘴','10%／段 の確率でダメージ2倍']},
+    drain:['吸収','与えたダメージの6%／段ぶん体力を回復'],ally:['呼び声','戦いの中でカラスの群れを呼べる回数 +1／段'],sweep:['ロングレーザー薙ぎ払い','長いレーザーで薙ぎ払う。段が上がるほどレーザーが太くなり、ふつうのビームにも貫通がつき、延焼の範囲が広がる'],guard:['頑丈','受けるダメージ -7%／段'],uniq:['一撃の嘴','10%／段 の確率でダメージ2倍']},
   ant:{hp:['生命力','食べられそうなときに逃れる確率 +5%／段'],atk:['大顎','侵入者を仕留める確率 +20%／段'],spd:['脚力','歩く速さ +6%／段'],
     drain:['女王の多産','卵を産む速さ +15%／段'],ally:['働きアリ','巣に集める食べ物 +15%／段'],guard:['硬い外骨格','逃れる確率 +6%／段'],uniq:['酸の噴射','食べた相手が酸で弱る']},
   mole:{hp:['生命力','食べられそうなときに逃れる確率 +5%／段'],atk:['鋭い爪','食事の栄養 +15%／段'],spd:['足の速さ','地上を歩く速さ +6%／段'],
@@ -7140,8 +7198,9 @@ const SKN={
 // エネミーのスキル名（固有スキルは種類ごと）
 (()=>{const base={hp:['体力強化','最大体力 +12%／段'],atk:['攻撃強化','与えるダメージ +10%／段'],spd:['俊敏','移動速度・スタミナ回復 +8%／段'],
   drain:['吸収','与えたダメージの6%／段ぶん体力を回復'],ally:['仲間呼び','戦いの中で呼べる動物園の仲間 +1頭／段'],guard:['頑丈','受けるダメージ -7%／段']};
-  const U={bear:['怪力','攻撃のダメージがさらに +15%／段'],lion:['連撃','攻撃の間隔 -12%／段'],elephant:['踏みつけ','相手のそばの敵にも 35%／段 のダメージ'],giraffe:['会心の一撃','10%／段 の確率でダメージ2倍'],croc:['再生のうろこ','水の中では毎秒 最大体力の0.8%／段 回復']};
-  for(const t in SKE)SKN[t]=Object.assign({},base,{uniq:U[t]});})();
+  const U={bear:['怪力','攻撃のダメージがさらに +15%／段'],lion:['連撃','攻撃の間隔 -12%／段'],elephant:['踏みつけ','相手のそばの敵にも 35%／段 のダメージ'],giraffe:['会心の一撃','10%／段 の確率でダメージ2倍'],croc:['再生のうろこ','水の中では毎秒 最大体力の0.8%／段 回復'],jelly:['巨大化','体が大きくなり、触手の届く距離 +0.3／段']};
+  for(const t in SKE)SKN[t]=Object.assign({},base,{uniq:U[t]});
+  SKN.jelly.atk=['毒の強さ','毒のダメージ +10%／段'];SKN.jelly.tent=['触手','触手の本数が増え、一度に刺せる相手 +1／段'];SKN.jelly.venom=['毒性','毒の種類が増える（1段：鈍化　2段：眠り　3段：猛毒　4段：仲間割れ　5段：すべて長く強く）'];})();
 // 出来事ごとの経験（討伐・安全の確保・倒れる など）
 var SKFLAG={crows:['crow',3],crowbreed:['crow',30,'safe'],crowmob:['crow',25,'kill'],crowseed:['crow',5],crowhit:['crow',15,'death'],crowold:['crow',30,'death'],
   bird:['heron',3],heroncrit:['heron',8,'kill'],heronhera:['heron',15,'kill'],heronbreed:['heron',30,'safe'],heronescape:['heron',15,'safe'],herondogmiss:['heron',15,'safe'],heroncatmiss:['heron',15,'safe'],fireheron:['heron',5,'safe'],
@@ -7194,7 +7253,7 @@ function updateBirdTeam(dt){
   if(BTL.team&&!BTL.teamLogged){BTL.teamLogged=true;logEvent('カラスとアオサギがチームを組みました！息を合わせて攻撃が強くなります','teamup','チームを組んでいるあいだ、カラスとアオサギの攻撃は2割増しになります');}
 }
 function skAntStore(){return 1+.15*skLv('ant','ally');}
-const AUTO_ORDER=['atk','hp','spd','eggs','anchor','boat','buster','sweep','atk','hp','drain','ally','anchor','ally','ally','guard','uniq','drain','spd','uniq','guard','atk','hp','drain','ally','uniq','spd','guard','atk','hp','drain','ally','guard','spd','drain','guard'];
+const AUTO_ORDER=['atk','hp','spd','eggs','anchor','boat','buster','sweep','venom','tent','venom','tent','atk','hp','drain','ally','anchor','ally','ally','guard','uniq','drain','spd','uniq','guard','atk','hp','drain','ally','uniq','spd','guard','atk','hp','drain','ally','guard','spd','drain','guard'];
 const SK=(()=>{
   const d={};for(const t in SKT)d[t]={xp:0,used:{},auto:true,deaths:0,kills:0};
   try{const s=JSON.parse(localStorage.getItem('kingyo-skill-v2')||'null');if(s)for(const t in SKT)if(s[t])Object.assign(d[t],s[t]);}catch(e){}
@@ -7598,7 +7657,7 @@ function updateGreat(dt){
     GREAT.floodT-=ed;GREAT.floodRise=Math.min(.9,GREAT.floodRise+ed*.04);
     FLOODEV.active=true;FLOODEV.t=Math.max(FLOODEV.t,1);   // 流れは洪水と同じく強い
     if(GREAT.floodT<=0){GREAT.flood=false;logEvent('大洪水がおさまり、水が引き始めました','greatfloodend');}
-  }else if(GREAT.floodRise>0)GREAT.floodRise=Math.max(0,GREAT.floodRise-ed*.012);
+  }else if(GREAT.floodRise>0)GREAT.floodRise=Math.max(0,GREAT.floodRise-ed*(RAIN.season==='rainy'?.012:.03));
   if(GREAT.dry||GREAT.flood||GREAT.dryDrop>0||GREAT.floodRise>0)applyWaterLevel();
 }
 // --- 波：水位が池より上のときにときどき起きる。水位が高いほど大きく速い ---
@@ -7948,7 +8007,7 @@ function moleHunt(m,dt){
   if(Math.hypot(t.p.x-m.pos.x,t.p.z-m.pos.z)<.05&&(m.biteCd=(m.biteCd||0)-dt)<=0){
     m.biteCd=R(.8,1.4);const pw=1+.15*skLv('mole','atk');skGain('mole',3,'kill');
     if(t.kind==='crit'){if(rng()<.25*pw){killCrit(t.o);m.energy=Math.min(1,m.energy+.25);logEvent('モグラが'+({frog:'カエル',crab:'サワガニ'}[t.o.type]||'小さな生き物')+'に襲いかかって食べました','molekill');}}
-    else if(t.kind==='fish'){if(rng()<.3*pw){t.o.die('eaten');m.energy=Math.min(1,m.energy+.3);logEvent('モグラが陸の金魚に襲いかかりました','molefish','地上に出たモグラは、小さな陸の金魚も襲います');}else t.o.fearT=3;}
+    else if(t.kind==='fish'){if(rng()<.3*pw){if(t.o.gc||t.o.fluke)moleInfect(m,'fish');t.o.die('eaten');m.energy=Math.min(1,m.energy+.3);logEvent('モグラが陸の金魚に襲いかかりました','molefish','地上に出たモグラは、小さな陸の金魚も襲います');}else t.o.fearT=3;}
     else if(t.kind==='ant'){killAnt(t.o);m.energy=Math.min(1,m.energy+.05);logEvent('モグラがアリを食べました','moleant');}
     else{t.o.itch=(t.o.itch||0)+2;logEvent('モグラが'+(t.kind==='human'?'人':t.kind==='cat'?'猫':'犬')+'の足にかみつきました！','molebite','追い詰められたモグラは、大きな相手にもかみつきます');
       if(t.o.itch>8){t.o.itch=0;if(t.kind==='human')humanLeave(undefined,t.o);else if(t.kind==='cat')catLeave(true);else dogLeave();}}
@@ -8034,22 +8093,38 @@ function beakTip(){
 }
 // ビームを撃つ。to に当たり、onHit(着弾点) を呼ぶ
 function heronBeam(to,onHit){
-  const from=beakTip(),dir=new THREE.Vector3().subVectors(to,from),len=dir.length();if(len<.02)return;
+  const L=skLv('heron','sweep'),from=beakTip();
+  // 貫通：レーザースキルの段があれば、ねらった相手を突き抜けてさらに先まで届く
+  const end=to.clone();
+  if(L>0){const hx=to.x-from.x,hz=to.z-from.z,hl=Math.hypot(hx,hz)||1;end.x+=hx/hl*.6*L;end.z+=hz/hl*.6*L;end.y=inWaterAt(end.x,end.z)?U.uWaterY.value:groundH(end.x,end.z);}
+  const dir=new THREE.Vector3().subVectors(end,from),len=dir.length();if(len<.02)return;
+  const th=1+.35*L;   // 段が上がるほど太く
   const g=new THREE.Group();
-  const o=new THREE.Mesh(BEAM_GEO,MAT.beamOuter.clone());o.scale.set(.018,1,.018);g.add(o);
-  const c=new THREE.Mesh(BEAM_GEO,MAT.beamCore.clone());c.scale.set(.007,1,.007);g.add(c);
+  const o=new THREE.Mesh(BEAM_GEO,MAT.beamOuter.clone());o.scale.set(.018*th,1,.018*th);g.add(o);
+  const c=new THREE.Mesh(BEAM_GEO,MAT.beamCore.clone());c.scale.set(.007*th,1,.007*th);g.add(c);
   g.position.copy(from).addScaledVector(dir,.5);g.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.clone().normalize());g.scale.y=len;
   g.renderOrder=30;scene.add(g);
   BIRD.yaw=Math.atan2(to.x-BIRD.pos.x,to.z-BIRD.pos.z);
-  BEAM.list.push({g,t:0,life:.45,o,c});
+  BEAM.list.push({g,t:0,life:.45,o,c});laserTrees(from.x,from.z,end.x,end.z);
   emitSparkles(to.clone(),18,.08,'bubble');addRipple(to.x,to.z,1);
-  beamImpact(to);if(onHit)onHit(to);
+  beamImpact(to,L);if(onHit)onHit(to);
+  if(L>0){beamImpact(end,L);laserPierce(from,end,L);}
+}
+// 貫通したレーザーが、通り道の敵やカラスにも当たる
+function laserPierce(from,end,L){
+  const ax=from.x,az=from.z,lx=end.x-ax,lz=end.z-az,L2=lx*lx+lz*lz||1,on=(p,r)=>{const q=clamp(((p.x-ax)*lx+(p.z-az)*lz)/L2,.15,1);return Math.hypot(p.x-(ax+lx*q),p.z-(az+lz*q))<r;};
+  let n=0;
+  if(BTL.on)for(const e of sweepEnemies())if(on(e.o.pos,e.r+.06+.02*L)){const dmg=R(10,18)*(1+.25*L);if(e.o.maxHp===undefined){e.o.maxHp=160*(e.o.len||1);e.o.hp=e.o.maxHp;}e.o.hp=Math.max(0,e.o.hp-skTake(e.o,dmg));e.o.flash=.4;n++;}
+  for(const k of CROWS.list.slice())if(!k.gone&&!k.carrying&&on(k.pos,.08+.02*L)){k.gone=true;scene.remove(k.g);CROWS.list.splice(CROWS.list.indexOf(k),1);n++;}
+  if(n)logEvent('貫通レーザー！一直線に'+n+'体を撃ち抜きました','laserpierce','レーザースキルの段が上がると、レーザーは相手を突き抜けて、その先の敵にも当たります');
 }
 // 着弾：陸の燃えるもの（草・木の下の地面）なら火がつく。水なら湯気が立つだけ
-function beamImpact(p){
+function beamImpact(p,L=0){
   if(inWaterAt(p.x,p.z)){emitSparkles(v2.set(p.x,U.uWaterY.value,p.z),10,.06,'bubble');
     for(const f of fishes)if(!f.gone&&f.state==='swim'&&f.pos.distanceTo(p)<.12&&rng()<.4){f.die('bird');logEvent('アオサギのビームが水面の金魚を撃ち抜きました','beamfish');break;}
     return;}
+  // 延焼：段が上がるほど、まわりにも火が広がる
+  for(let k=0;k<L*2;k++){const a=R(0,6.28),r=R(.04,.06+.05*L),x=p.x+Math.cos(a)*r,z=p.z+Math.sin(a)*r;if(canBurn(x,z))igniteCell(x,z);}
   if(canBurn(p.x,p.z)){igniteCell(p.x,p.z);statsDirty=true;logEvent('アオサギのビームが燃え移り、火の手が上がりました！','beamfire','アオサギの口から放たれた光線は、草や木の根元など燃えるものに当たると火をつけます。水の上では消えてしまいます');}
 }
 function updateBeams(dt){
@@ -8079,6 +8154,9 @@ function updateBeams(dt){
     return;
   }
   // ふだん：近づいてきた猫や犬を追い払う
+  // 喫煙者・カラス・外来種を見つけると積極的に撃つ／たまに気まぐれの180度レーザー
+  if((BIRD.st==='stand'||BIRD.st==='wade')&&(BEAM.huntCd=(BEAM.huntCd===undefined?3:BEAM.huntCd)-dt)<=0){BEAM.huntCd=heronLaserHunt()?R(4,7):1.5;}
+  if((BIRD.st==='stand'||BIRD.st==='wade')&&!SWEEP.on&&rng()<dt*.006)heronWhimSweep();
   if((BIRD.st==='stand'||BIRD.st==='wade')&&(BEAM.petCd-=dt)<=0){
     for(const k of ['cat','dog']){
       const p=PET[k];if(!p.g||!p.g.visible||p.st==='away'||p.st==='leave')continue;
@@ -8127,29 +8205,568 @@ function updateSweep(dt){
   const ex=BIRD.pos.x+Math.sin(a)*S.len,ez=BIRD.pos.z+Math.cos(a)*S.len,ey=inWaterAt(ex,ez)?U.uWaterY.value:groundH(ex,ez);
   const to=new THREE.Vector3(ex,ey,ez),dir=new THREE.Vector3().subVectors(to,from),len=dir.length();
   g.visible=true;g.position.copy(from).addScaledVector(dir,.5);g.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());g.scale.set(1,len,1);
+  const th=1+.35*S.lv;g.userData.o.scale.set(.028*th,1,.028*th);g.userData.c.scale.set(.011*th,1,.011*th);   // 段が上がるほど太く
   const fl=.75+.25*Math.sin(S.t*40);g.userData.o.material.opacity=.8*fl;g.userData.c.material.opacity=.95;
   BIRD.yaw=a;
   // 光線上の敵にダメージ（1回の薙ぎ払いで1体につき1回）
-  const px=BIRD.pos.x,pz=BIRD.pos.z,lx=ex-px,lz=ez-pz,L2=lx*lx+lz*lz;
+  const px=BIRD.pos.x,pz=BIRD.pos.z,lx=ex-px,lz=ez-pz,L2=lx*lx+lz*lz;laserTrees(px,pz,ex,ez);
   for(const e of sweepEnemies()){
     if(S.hit.has(e.o))continue;
     const t=clamp(((e.o.pos.x-px)*lx+(e.o.pos.z-pz)*lz)/L2,0,1),cx=px+lx*t,cz=pz+lz*t;
     if(Math.hypot(e.o.pos.x-cx,e.o.pos.z-cz)<e.r+.08){
-      S.hit.add(e.o);const dmg=R(25,40)*skFAtk(S.F)*(1+.2*S.lv);
+      S.hit.add(e.o);const dmg=R(25,40)*(S.F?skFAtk(S.F):1)*(1+.2*S.lv);
       if(e.o.maxHp===undefined){e.o.maxHp=160*(e.o.len||1);e.o.hp=e.o.maxHp;}
-      e.o.hp=Math.max(0,e.o.hp-skTake(e.o,dmg));e.o.flash=.5;skDealt(S.F,dmg);
+      e.o.hp=Math.max(0,e.o.hp-skTake(e.o,dmg));e.o.flash=.5;if(S.F)skDealt(S.F,dmg);
       emitSparkles(v1.set(e.o.pos.x,(e.o.y||0)+.2,e.o.pos.z),20,.1,'dirt');
       logEvent('薙ぎ払いのレーザーが'+e.nm+'を焼き、'+Math.round(dmg)+'のダメージ！','sweephit');
     }
   }
   // 通り道に火をつける（燃えるものの上だけ）
-  if((S.fireT-=dt)<=0&&S.fires<10){
+  if((S.fireT-=dt)<=0&&S.fires<10+6*S.lv){
     S.fireT=.09;const q=R(.4,1),fx=px+lx*q,fz=pz+lz*q;
-    if(canBurn(fx,fz)){igniteCell(fx,fz);S.fires++;statsDirty=true;}
+    if(canBurn(fx,fz)){igniteCell(fx,fz);S.fires++;statsDirty=true;for(let e=0;e<Math.floor(S.lv/2)+1;e++){const a=R(0,6.28),r=R(.04,.05+.06*S.lv),x2=fx+Math.cos(a)*r,z2=fz+Math.sin(a)*r;if(canBurn(x2,z2))igniteCell(x2,z2);}}   // 延焼が広がる
     else if(inWaterAt(fx,fz))emitSparkles(v2.set(fx,U.uWaterY.value,fz),4,.05,'bubble');
   }
   if(rng()<dt*30)emitSparkles(to.clone(),3,.05,'dirt');
   if(k>=1){g.visible=false;if(S.fires)logEvent('薙ぎ払われた跡に、点々と火の手が上がっています','sweepfire');SWEEP.on=null;}
+}
+/* ============ モグラがまれに爆発し、地面に大穴をあける ============ */
+const BOOM={list:[]};
+MAT.boom=new THREE.MeshBasicMaterial({color:'#ffb24a',transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false});
+MAT.smokeBall=new THREE.MeshStandardMaterial({color:'#4a4038',transparent:true,opacity:.7,roughness:1,depthWrite:false});
+function moleBoom(m){const x=m.land?m.pos.x:m.x,z=m.land?m.pos.z:m.z;killCrit(m);boomAt(x,z,'mole');}
+// 爆発（モグラが自分で爆発しても、カラスに投げつけられても同じ）。中心に近いほど大ダメージ
+function boomAt(x,z,why){
+  const y=groundH(x,z),R0=.6;
+  // 見た目：火球と土煙
+  const fb=new THREE.Mesh(SPH,MAT.boom.clone());fb.position.set(x,y+.05,z);fb.scale.setScalar(.05);fb.renderOrder=31;scene.add(fb);
+  const sm=new THREE.Mesh(SPH,MAT.smokeBall.clone());sm.position.set(x,y+.08,z);sm.scale.setScalar(.05);scene.add(sm);
+  BOOM.list.push({fb,sm,t:0});
+  emitSparkles(v1.set(x,y+.05,z),60,.25,'dirt');addRipple(x,z,2.5);
+  // 地面に大穴（池の上や川では穴はあかない）
+  const onLand=onBank(x,z)&&!inPond(x,z)&&!(RIVER.on&&inRiver(x,z,.05));
+  if(onLand&&TERR.on){
+    // 地面の土台より下は見えないので、穴の中は平らにえぐり、まわりに土を盛り上げてクレーターにする
+    const r=R(.32,.42);TERR.mods.push({x,z,r:r*.9,h:-.03,max:-.03});
+    for(let k=0;k<12;k++){const an=k/12*Math.PI*2;TERR.mods.push({x:x+Math.cos(an)*r,z:z+Math.sin(an)*r,r:r*.45,h:.07,max:.07});}
+    const pm=new THREE.Mesh(PUDDLE_GEO,MAT.puddle);pm.renderOrder=4;pm.visible=false;pm.position.set(x,.003,z);ENV.group.add(pm);
+    TERR.dips.push({x,z,r:r*.8,fill:0,hole:null,mini:false,mesh:pm,rimH:.01});
+    refreshTerrain(x,z,r*1.5+.1);clearGrassAt(x,z,r*.95);
+    // むき出しになった土
+    const soil=new THREE.Mesh(new THREE.CircleGeometry(r*.8,28),MAT.crater);soil.rotation.x=-Math.PI/2;soil.position.set(x,Math.max(.006,groundH(x,z)+.004),z);soil.receiveShadow=true;ENV.group.add(soil);
+    for(let k=0;k<10;k++){const an=k/10*Math.PI*2+R(-.2,.2),rr=r*R(.85,1.1),rx=x+Math.cos(an)*rr,rz=z+Math.sin(an)*rr;const c=new THREE.Mesh(SPH,MAT.crater);c.scale.set(R(.03,.06),R(.015,.03),R(.03,.06));c.position.set(rx,groundH(rx,rz),rz);c.castShadow=true;ENV.group.add(c);}   // 吹き飛んだ土の山
+  }
+  // 爆風：まわりの生き物を吹き飛ばし、ダメージを与える
+  const near=(p,r)=>Math.hypot(p.x-x,p.z-z)<r;
+  const push=(p,k)=>{const dx=p.x-x,dz=p.z-z,d=Math.hypot(dx,dz)||1;p.x+=dx/d*k;p.z+=dz/d*k;};
+  const fall=p=>Math.max(0,1-Math.hypot(p.x-x,p.z-z)/(R0+.1));
+  for(const H of [HUMAN,...ANG.list,...HUNT.list]){
+    if(!H||!H.g||!H.g.visible||H.boat||['away','exit'].includes(H.st)||!near(H.pos,R0))continue;
+    push(H.pos,.25);const F=BTL.on?BTL.f.find(f=>f.o===H):null;
+    if(F)hurtFighter(F,40+70*fall(H.pos),null);else humanLeave(undefined,H);
+  }
+  for(const k of ['cat','dog']){const p=PET[k];if(!p.g||!p.g.visible||p.st==='away'||!near(p.pos,R0))continue;push(p.pos,.3);const F=BTL.on?BTL.f.find(f=>f.o===p):null;if(F)hurtFighter(F,40+70*fall(p.pos),null);else if(k==='cat')catLeave(true);else dogLeave();}
+  for(const B of BTL.zoo)if(B.state!=='dead'&&near(B.pos,R0+.1)){B.hp=Math.max(0,B.hp-skTake(B,60+140*fall(B.pos)));B.flash=.6;push(B.pos,.15);}
+  for(const c of CROC.list)if(c.st!=='captured'&&near(c.pos,R0)){if(c.maxHp===undefined){c.maxHp=160*c.len;c.hp=c.maxHp;}c.hp=Math.max(0,c.hp-skTake(c,60+140*fall(c.pos)));c.flash=.6;}
+  if((BIRD.st==='stand'||BIRD.st==='wade')&&near(BIRD.pos,R0)){const F=BTL.on?BTL.f.find(f=>f.kind==='heron'):null;if(F)hurtFighter(F,40+70*fall(BIRD.pos),null);else birdLeave();}
+  for(const c of CRIT.slice())if(!c.gone&&c.pos&&near(c.pos,R0*.8))killCrit(c);
+  for(const f of fishes)if(!f.gone&&f.state==='land'&&near(f.pos,R0*.8))f.die('eaten');
+  for(const a of ANTS.list.slice())if(near(a.pos,R0*.7)&&a.pos.y>-.02)killAnt(a);
+  for(const t of NUT.trees)if(near(t.pos,R0+.2))t.shake=1.2;
+  if(onLand&&canBurn(x+R(-.15,.15),z+R(-.15,.15)))igniteCell(x+R(-.15,.15),z+R(-.15,.15));
+  statsDirty=true;
+  if(why==='throw')logEvent('カラスが投げつけたモグラが大爆発！あたりが吹き飛びました！','crowboom','カラスはモグラをくわえて運び、敵めがけて投げつけます。モグラは地面に当たると爆発します');
+  else logEvent('モグラが突然爆発し、地面に大穴があきました！','moleboom','まれに、モグラが大爆発を起こします。まわりの生き物は吹き飛ばされ、地面には大きな穴が残ります。穴には雨水がたまることもあります');
+}
+MAT.crater=new THREE.MeshStandardMaterial({color:'#0e0804',roughness:1});
+// 穴の中の草を取り除く
+function clearGrassAt(x,z,r){
+  const im=ENV.grass;if(!im)return;const m4=new THREE.Matrix4(),z0=new THREE.Matrix4().makeScale(0,0,0);
+  for(let i=0;i<im.count;i++){im.getMatrixAt(i,m4);const e=m4.elements;if(Math.hypot(e[12]-x,e[14]-z)<r)im.setMatrixAt(i,z0);}
+  im.instanceMatrix.needsUpdate=true;
+}
+function updateMoleBoom(dt){
+  for(let i=BOOM.list.length-1;i>=0;i--){
+    const b=BOOM.list[i];b.t+=dt;const k=b.t/1.4;
+    b.fb.scale.setScalar(.05+.6*Math.min(1,b.t/.25));b.fb.material.opacity=Math.max(0,.85*(1-b.t/.45));
+    b.sm.scale.setScalar(.08+.5*Math.min(1,k));b.sm.position.y+=dt*.25;b.sm.material.opacity=Math.max(0,.7*(1-k));
+    if(k>=1){scene.remove(b.fb);scene.remove(b.sm);b.fb.material.dispose();b.sm.material.dispose();BOOM.list.splice(i,1);}
+  }
+  if(!P.eco||!P.moleBoom)return;
+  for(const m of MOLE.list.slice())if(rng()<dt*P.ecoSpeed*.0006*P.moleBoom)moleBoom(m);
+}
+/* ============ カラスがモグラをくわえて運び、敵に投げつける（当たると爆発） ============ */
+const CTHROW={job:null,cd:8};
+function moleSpot(m){return m.land?new THREE.Vector3(m.pos.x,.05,m.pos.z):new THREE.Vector3(m.x,.05,m.z);}
+function throwFoe(){const fs=fightingBeasts();if(BTL.croc&&!BTL.crocOut)fs.push(BTL.croc);return fs.length?pick(fs):null;}
+function updateCrowThrow(dt){
+  let J=CTHROW.job;
+  if(!J){
+    if(!BTL.on||!P.crowThrow||!MOLE.list.length||(CTHROW.cd-=dt*(MOLE.list.some(x=>x.para&&x.land)?2.5:1))>0)return;
+    const F=BTL.f.find(f=>f.kind==='crow'&&f.o&&!f.o.gone&&!(f.o.grounded>0));const E=throwFoe();if(!F||!E)return;
+    CTHROW.cd=R(10,16);
+    const inf=MOLE.list.filter(x=>x.para&&x.land),m=inf.length?pick(inf):pick(MOLE.list);CTHROW.job=J={F,k:F.o,m,E,phase:'fetch',t:0,vis:null};F.o.carrying=true;
+    logEvent('カラスがモグラめがけて急降下していきます……','crowfetch');
+    return;
+  }
+  const k=J.k,alive=k&&!k.gone&&CROWS.list.includes(k);
+  const fly=(tx,ty,tz,spd)=>{const dx=tx-k.pos.x,dy=ty-k.pos.y,dz=tz-k.pos.z,d=Math.hypot(dx,dy,dz);if(d>1e-3){const s=Math.min(d,spd*dt);k.pos.x+=dx/d*s;k.pos.y+=dy/d*s;k.pos.z+=dz/d*s;k.yaw=Math.atan2(dx,dz);}if(k.g){k.g.position.copy(k.pos);k.g.rotation.y=k.yaw;}return d;};
+  if(J.phase==='fetch'){
+    if(!alive||!MOLE.list.includes(J.m)){if(k)k.carrying=false;CTHROW.job=null;return;}
+    const p=moleSpot(J.m);
+    if(fly(p.x,p.y+.04,p.z,1.8)<.08){
+      // くわえて持ち上げる（地中のモグラも引っぱり出す）
+      J.vis=J.m.g.clone();J.vis.visible=true;J.vis.scale.multiplyScalar(1.1);scene.add(J.vis);killCrit(J.m);J.phase='carry';
+      logEvent('カラスがモグラをくわえて舞い上がりました！','crowgrab','カラスは爆発するモグラを武器にします');
+    }
+    return;
+  }
+  if(J.phase==='carry'){
+    if(!alive){J.phase='drop';J.from=J.vis.position.clone();J.to=new THREE.Vector3(J.vis.position.x,groundH(J.vis.position.x,J.vis.position.z),J.vis.position.z);J.t=0;return;}
+    let E=J.E;if(!E||E.hp<=0||(E.state&&E.state==='dead')||(!BTL.zoo.includes(E)&&!CROC.list.includes(E))){E=J.E=throwFoe();}
+    const tgt=E?E.pos:new THREE.Vector3(k.pos.x,0,k.pos.z);
+    const d=fly(tgt.x,.9,tgt.z,1.5);
+    J.vis.position.set(k.pos.x,k.pos.y-.06,k.pos.z);J.vis.rotation.z=Math.sin(U.uTime.value*12)*.4;
+    if(!E||Math.hypot(tgt.x-k.pos.x,tgt.z-k.pos.z)<.25){
+      J.phase='throw';J.t=0;J.from=J.vis.position.clone();
+      const gy=E?(E===BTL.croc?U.uWaterY.value:groundH(E.pos.x,E.pos.z)):groundH(k.pos.x,k.pos.z);
+      J.to=new THREE.Vector3(E?E.pos.x:k.pos.x,gy,E?E.pos.z:k.pos.z);
+      logEvent('カラスがモグラを'+(E?(E===BTL.croc?'ワニ':E.nm):'地面')+'めがけて投げつけた！','crowthrow');
+    }
+    return;
+  }
+  if(J.phase==='throw'||J.phase==='drop'){
+    J.t+=dt;const q=Math.min(1,J.t/.45);
+    J.vis.position.set(lerp(J.from.x,J.to.x,q),lerp(J.from.y,J.to.y,q)+Math.sin(q*Math.PI)*.12,lerp(J.from.z,J.to.z,q));J.vis.rotation.x+=dt*14;
+    if(q>=1){scene.remove(J.vis);CTHROW.job=null;if(k)k.carrying=false;boomAt(J.to.x,J.to.z,'throw');if(J.F)skGain('crow',30,'kill');}
+  }
+}
+/* ============ モグラの寄生虫：感染したモグラは地上をさまよい、カラスにくわえられやすくなる ============ */
+MAT.paraSpot=new THREE.MeshStandardMaterial({color:'#7a2a8a',roughness:.6,emissive:'#3a0a40',emissiveIntensity:.6});
+function moleInfect(m,why){
+  if(m.para||m.gone)return;m.para=true;m.paraT=R(90,150);
+  if(m.g)for(let k=0;k<6;k++){const s=new THREE.Mesh(SPH,MAT.paraSpot);s.scale.setScalar(R(.006,.01));s.position.set(R(-.02,.02),R(.01,.03),R(-.03,.03));m.g.add(s);}
+  logEvent('モグラが寄生虫に感染しました'+({grub:'（地虫から）',fish:'（感染した金魚を食べて）',mole:'（仲間からうつった）'}[why]||''),'molepara','この寄生虫はモグラをあやつって地上に出させ、カラスに食べられやすくします。カラスの体の中で育つためだと考えられています（実在する「宿主操作」をヒントにしています）');
+}
+function updateMolePara(dt){
+  const ed=P.eco?dt*P.ecoSpeed:0;if(!ed)return;
+  for(const m of MOLE.list.slice()){
+    if(!m.para){if(rng()<ed*.0004)moleInfect(m,'grub');continue;}
+    // 仲間へうつる
+    for(const o of MOLE.list)if(o!==m&&!o.para){const ax=m.land?m.pos.x:m.x,az=m.land?m.pos.z:m.z,bx=o.land?o.pos.x:o.x,bz=o.land?o.pos.z:o.z;if(Math.hypot(ax-bx,az-bz)<.25&&rng()<ed*.05)moleInfect(o,'mole');}
+    // 地中にいても、あやつられて地上へ出てくる
+    if(!m.land&&rng()<ed*.25){
+      const lz=Math.min(m.z,P.pondL/2-.08);
+      if(onBank(m.x,lz)&&!isWet3(m.x,m.y,m.z)){makeHill(m.x,m.z);m.land=true;m.state='land';m.hidden=false;m.hx=m.x;m.hz=lz;m.pos.set(m.x,.03,lz);m.landT=R(12,25);m.yaw=R(0,6.28);m.wp=null;m.tgt=null;
+        logEvent('寄生虫に感染したモグラが、ふらふらと地上に出てきました','moleparaup','ふだんは地中で暮らすモグラが、ひらけた地上を無防備に歩き回ります');}
+    }
+    // 地上ではふらつきながら、ひらけた場所を歩き回る
+    if(m.land){m.yaw+=Math.sin(U.uTime.value*3+m.x*10)*dt*2;m.landT=Math.max(m.landT,5);}
+    m.paraT-=ed;
+    if(m.paraT<=0){logEvent('寄生虫に弱ったモグラが力尽きました','moleparadie');killCrit(m);}
+  }
+}
+/* ============ ランダムトピック：何も起きていないときにも、箱庭のこぼれ話や豆知識が流れる ============ */
+const RTOPIC={t:R(25,40)};
+const RT_TRIVIA=[
+  ['金魚の豆知識','金魚のふるさとは中国。フナの突然変異から、千年以上かけて今の姿になりました'],
+  ['金魚の豆知識','金魚は記憶力が3秒、というのは誤解。エサの時間を覚えることもできます'],
+  ['金魚の豆知識','金魚にもまぶたはありません。眠るときも目を開けたままです'],
+  ['金魚の豆知識','水温が下がると、金魚は動きがゆっくりになり、ほとんど食べなくなります'],
+  ['池の豆知識','水草は酸素を出すだけでなく、稚魚や卵の隠れ家にもなります'],
+  ['池の豆知識','浮き草が水面をおおうと、水中に光が届きにくくなり、藻が減ります'],
+  ['アオサギの豆知識','アオサギは首をS字に曲げて飛びます。ツルは首をまっすぐ伸ばして飛びます'],
+  ['カラスの豆知識','カラスは遊ぶことがあります。雪の坂をすべり降りる姿も見られています'],
+  ['モグラの豆知識','モグラは半日ほど何も食べないと弱ってしまうほど、たくさん食べる生き物です'],
+  ['モグラの豆知識','モグラのトンネルは、ミミズが落ちてくるのを待つ「わな」でもあります'],
+  ['アリの豆知識','アリは地面に「におい」の道しるべを残して、仲間に食べ物の場所を伝えます'],
+  ['アリの豆知識','兵隊アリは大きな頭とあごで、巣を守る役目をしています'],
+  ['カエルの豆知識','カエルは皮ふでも呼吸します。だから乾燥がとても苦手です'],
+  ['ザリガニの豆知識','ザリガニは脱皮をくり返して大きくなります。脱いだ殻を食べることも'],
+  ['ヘラブナの豆知識','ヘラブナは植物プランクトンを食べるフナ。釣り人に大人気の魚です'],
+  ['ブラックバスの豆知識','ブラックバスは北アメリカ原産。日本では在来の魚を減らす外来種です'],
+  ['生態系の豆知識','食べる・食べられるのつながりを「食物網」と呼びます。どれか一つが欠けると全体が揺らぎます'],
+  ['生態系の豆知識','寄生虫が宿主の行動を変える「宿主操作」は、自然界で実際に見られる現象です'],
+  ['木の豆知識','森林火災のあとは、日当たりと灰の養分で、新しい芽が一気に育つことがあります'],
+  ['天気の豆知識','雨が続いて地面が水を吸いきれなくなると、川や池があふれやすくなります']
+];
+const RT_WHIM=[
+  ['箱庭のひとこと','今日もこの池では、だれかが食べ、だれかが逃げ、だれかが生まれています'],
+  ['箱庭のひとこと','もし金魚が言葉を話せたら、最初に何と言うでしょう'],
+  ['箱庭のひとこと','カメラをぐるっと回すと、思わぬところで事件が起きているかもしれません'],
+  ['箱庭のひとこと','水面をクリックするとエサをまけます。金魚たちが集まってきますよ'],
+  ['箱庭のひとこと','タイトル横のアイコンから、スキルツリーをのぞいてみませんか'],
+  ['箱庭のひとこと','池の前面のガラス越しに見ると、水の中の暮らしがよく見えます']
+];
+// いまの箱庭のようすから話題をつくる
+function rtState(){
+  const out=[],live=fishes.filter(f=>!f.gone&&f.state!=='dead');
+  if(live.length){const big=live.reduce((a,f)=>f.scale>a.scale?f:a,live[0]),pct=Math.round((big.scale/(live.reduce((s,f)=>s+f.scale,0)/live.length)-1)*100);out.push(['いまの池のようす','金魚は'+live.length+'匹。'+(pct>=5?'いちばん大きな個体は、平均より'+pct+'%ほど大きく育っています':'みんなまだ同じくらいの大きさです')]);}
+  if(ECO.eggs.length)out.push(['いまの池のようす','水草のかげに、卵が'+ECO.eggs.length+'個。無事にかえるでしょうか']);
+  const sk=Object.keys(SKT).filter(t=>!skIsEnemy(t)).sort((a,b)=>SK[b].xp-SK[a].xp)[0];
+  if(sk&&SK[sk].xp>50)out.push(['血統の記録','いちばん経験を積んでいる味方の血統は「'+SKT[sk]+'」。経験 '+Math.floor(SK[sk].xp)+'・倒れた数 '+SK[sk].deaths]);
+  const ek=Object.keys(SKT).filter(t=>skIsEnemy(t)).sort((a,b)=>SK[b].xp-SK[a].xp)[0];
+  if(ek&&SK[ek].xp>50)out.push(['エネミーの記録','いちばん手ごわくなっている敵の血統は「'+SKT[ek]+'」。経験 '+Math.floor(SK[ek].xp)]);
+  for(const B of BTL.zoo)if(B.state!=='dead')out.push(['居座る動物',B.nm+'がまだ箱庭にいます（Lv'+(B.lv||0)+'・体力'+Math.round(B.hp/B.maxHp*100)+'%）']);
+  if(CROC.list.length)out.push(['居座る動物','ワニが'+CROC.list.length+'頭、水辺にひそんでいます']);
+  if(HK.earned)out.push(['人間の財布','人間たちは毛皮で累計'+HK.earned+'円を稼ぎ、いまの所持金は'+HK.money+'円です']);
+  if(WOOD.n||FAC.list.length)out.push(['洪水への備え','木材'+WOOD.n+'本、高台の施設'+FAC.list.filter(f=>f.prog>=1).length+'棟。備えは万全でしょうか']);
+  if(NUT.trees.length){const t=NUT.trees.reduce((a,b)=>(b.mature||0)>(a.mature||0)?b:a);if((t.mature||0)>.2)out.push(['木の育ち',treeName(t)+'が、植えられたころの'+(1+.9*t.mature).toFixed(1)+'倍の高さに育っています']);}
+  if(ANTS.list.length)out.push(['アリの巣','アリの巣には'+ANTS.list.length+'匹（兵隊'+ANTS.list.filter(a=>a.role==='soldier').length+'匹）。'+(ANTS.q?'女王は健在です':'女王はいません')]);
+  if(MOLE.list.some(m=>m.para))out.push(['気になるうわさ','寄生虫に感染したモグラが、地上をうろついているようです']);
+  if(FIRE.ash.size)out.push(['焼け跡','焼け跡は'+FIRE.ash.size+'か所。灰の養分で、植物がよく育っています']);
+  if(RAIN.amt>.3)out.push(['空もよう','雨が降っています。くぼみに水がたまり、カエルが元気になります']);
+  return out;
+}
+function randomTopic(){
+  const pool=rtState(),r=rng();
+  const t=(pool.length&&r<.5)?pick(pool):(r<.85?pick(RT_TRIVIA):pick(RT_WHIM));
+  showToast('ランダムトピック：'+t[0],t[1]);
+}
+function updateRandomTopics(dt){
+  if(!P.randomTopics||P.toastMode==='off')return;
+  if((RTOPIC.t-=dt)>0)return;
+  // ほかの話題が出たばかりなら少し待つ
+  if(performance.now()-TOAST.last<6000){RTOPIC.t=3;return;}
+  RTOPIC.t=(P.randomTopics===2?R(18,32):R(35,60));
+  TOAST.last=performance.now();randomTopic();
+}
+/* ============ アオサギのレーザー（追加）：喫煙者・カラス・外来種をねらう ／ 気まぐれ180度 ／ 木をなぎ倒す ============ */
+const TOPPLE={list:[]};
+// レーザーの通り道にある木をなぎ倒す
+function laserTrees(ax,az,bx,bz){
+  const lx=bx-ax,lz=bz-az,L2=lx*lx+lz*lz||1;
+  for(const t of NUT.trees.slice()){
+    const q=clamp(((t.pos.x-ax)*lx+(t.pos.z-az)*lz)/L2,0,1),cx=ax+lx*q,cz=az+lz*q;
+    if(Math.hypot(t.pos.x-cx,t.pos.z-cz)<treeRadius(t)+.04)toppleTree(t,lx,lz);
+  }
+}
+function toppleTree(t,dx,dz){
+  const i=NUT.trees.indexOf(t);if(i<0)return;NUT.trees.splice(i,1);
+  const oi=ENV.obstacles.findIndex(o=>Math.hypot(o.x-t.pos.x,o.z-t.pos.z)<.02);if(oi>=0)ENV.obstacles[oi].r=.06;
+  const d=Math.hypot(dx,dz)||1;
+  TOPPLE.list.push({t,k:0,hold:0,q0:t.g.quaternion.clone(),axis:new THREE.Vector3(dz/d,0,-dx/d)});
+  emitSparkles(v1.set(t.pos.x,.3,t.pos.z),20,.1,'dirt');
+  logEvent('アオサギのレーザーが'+treeName(t)+'をなぎ倒しました！','lasertree','高熱のレーザーは、通り道の木の幹も焼き切ってしまいます。倒れた木は人間の木材になります');
+}
+function updateTopple(dt){
+  for(let i=TOPPLE.list.length-1;i>=0;i--){
+    const T=TOPPLE.list[i],t=T.t;
+    if(T.k<1){treeCrush(t.g,t.pos);T.k=Math.min(1,T.k+dt*(.4+T.k*2.2));const q=new THREE.Quaternion().setFromAxisAngle(T.axis,T.k*Math.PI/2*.95);t.g.quaternion.copy(q).multiply(T.q0);if(T.k>=1){addRipple(t.pos.x,t.pos.z,2);emitSparkles(v1.set(t.pos.x,.05,t.pos.z),30,.2,'dirt');}}
+    else if((T.hold+=dt)>1){
+      disposeTree(t.g);
+      const s=new THREE.Group();mk(s,CYL,t.kind==='kaki'?MAT.kakiBark:MAT.oakBark,.05,.05,.05,0,.025,0);mk(s,CYL,MAT.hWood,.044,.004,.044,0,.051,0);s.position.set(t.pos.x,0,t.pos.z);(ENV.decor||ENV.group).add(s);
+      HUMAN.stumps.push({m:s,x:t.pos.x,z:t.pos.z,t:0,kind:t.kind||'oak'});WOOD.n+=1;statsDirty=true;
+      TOPPLE.list.splice(i,1);
+    }
+  }
+}
+// ふだんのアオサギ：喫煙者・カラス・外来種を見つけると積極的にレーザー
+function heronHuntTargets(){
+  const out=[],near=p=>Math.hypot(p.x-BIRD.pos.x,p.z-BIRD.pos.z)<2.6;
+  for(const H of [HUMAN,...ANG.list])if(H&&H.g&&H.g.visible&&H.smoking>0&&near(H.pos))out.push({kind:'smoker',o:H,p:new THREE.Vector3(H.pos.x,groundH(H.pos.x,H.pos.z)+.62,H.pos.z)});
+  for(const J of JELLY.list)if(near(J.pos))out.push({kind:'jelly',o:J,p:J.pos.clone()});
+  for(const c of CROWS.list)if(!c.gone&&!c.leaving&&!c.fighting&&!c.carrying&&near(c.pos))out.push({kind:'crow',o:c,p:c.pos.clone()});
+  for(const b of INV.bass)if(!b.gone&&!b.hookedBy&&near(b.pos))out.push({kind:'bass',o:b,p:b.pos.clone()});
+  for(const c of INV.cray)if(!c.gone&&near(c.pos))out.push({kind:'cray',o:c,p:c.pos.clone()});
+  return out;
+}
+function heronLaserHunt(){
+  const ts=heronHuntTargets();if(!ts.length)return false;
+  const pri={smoker:0,jelly:1,crow:2,bass:3,cray:4};ts.sort((a,b)=>pri[a.kind]-pri[b.kind]);const t=ts[0];
+  heronBeam(t.p,()=>{
+    if(t.kind==='smoker'){const u=t.o.g.userData;if(u.cig)u.cig.visible=false;t.o.smoking=0;humanLeave(undefined,t.o);logEvent('タバコを吸っていた人に、アオサギがレーザー！あわてて逃げていきました','laserSmoker','アオサギはタバコの煙が大嫌い。喫煙者を見つけると、まっさきにレーザーを撃ちます');}
+    else if(t.kind==='jelly'){
+      const J=t.o;if(!JELLY.list.includes(J))return;
+      if(jellyFront(J,BIRD.pos)){jellyDodge(J,BIRD.pos,'レーザー');shieldFX(J);J.cd=Math.min(J.cd,.2);}
+      else{
+        emitSparkles(J.pos.clone(),26,.1,'bubble');jellyPop(J);JELLY.list.splice(JELLY.list.indexOf(J),1);skGain('jelly',40,'death');
+        JELLY.stings=JELLY.stings.filter(S=>{if(JELLY.list.includes(S.J))return true;scene.remove(S.line);return false;});
+        logEvent('アオサギのレーザーが、横から（背後から）クラゲを撃ち抜きました！','laserJelly','クラゲは正面以外からの攻撃には弱いのです');
+      }
+    }
+    else if(t.kind==='crow'){const c=t.o;c.gone=true;scene.remove(c.g);const i=CROWS.list.indexOf(c);if(i>=0)CROWS.list.splice(i,1);emitSparkles(t.p,14,.08,'dirt');logEvent('アオサギのレーザーがカラスを撃ち落としました！','laserCrow','ふだんから獲物を奪い合うカラスは、アオサギの天敵です');}
+    else if(t.kind==='bass'){removeInv(t.o);const i=INV.bass.indexOf(t.o);if(i>=0)INV.bass.splice(i,1);logEvent('アオサギのレーザーが、外来種のブラックバスを撃ち抜きました','laserBass','アオサギは池を荒らす外来種をねらい撃ちします');}
+    else{removeInv(t.o);const i=INV.cray.indexOf(t.o);if(i>=0)INV.cray.splice(i,1);logEvent('アオサギのレーザーが、外来種のザリガニを撃ち抜きました','laserCray','アオサギは池を荒らす外来種をねらい撃ちします');}
+  });
+  return true;
+}
+// 気まぐれの180度レーザー
+function heronWhimSweep(){
+  if(SWEEP.on)return;const mid=BIRD.yaw||0;
+  SWEEP.on={F:null,lv:Math.max(1,skLv('heron','sweep')),t:0,dur:1.8,a0:mid-Math.PI/2,a1:mid+Math.PI/2,len:2.6+.3*skLv('heron','sweep'),hit:new Set(),fireT:0,fires:0};
+  logEvent('アオサギが気まぐれに、180度ぐるりとレーザーを放ちました！','laserWhim','アオサギはたまに、なんの前ぶれもなく半円を描くようにレーザーを撃ちます。通り道の木はなぎ倒され、草には火がつきます');
+}
+/* ============ 空中を漂うクラゲ：長い触手で離れた相手を刺し、毒を送り込む ============ */
+const JELLY={list:[],stings:[],poison:[]};
+MAT.jellyBell=new THREE.MeshStandardMaterial({color:'#e07ad0',transparent:true,opacity:.55,roughness:.2,emissive:'#7a2a90',emissiveIntensity:.5,side:THREE.DoubleSide,depthWrite:false});
+MAT.jellyCore=new THREE.MeshBasicMaterial({color:'#ffd0f4',transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false});
+MAT.jellyTent=new THREE.LineBasicMaterial({color:'#d890e8',transparent:true,opacity:.7});
+MAT.jellySting=new THREE.LineBasicMaterial({color:'#f6a0ff',transparent:true,opacity:.95});
+const JTN=6,JTP=9;
+function buildJelly(){
+  const g=new THREE.Group();
+  const bell=new THREE.Mesh(new THREE.SphereGeometry(1,18,10,0,Math.PI*2,0,Math.PI/2),MAT.jellyBell);bell.scale.set(.09,.07,.09);g.add(bell);
+  const core=new THREE.Mesh(SPH,MAT.jellyCore);core.scale.set(.035,.025,.035);core.position.y=.015;g.add(core);
+  for(const sx of [-1,1]){const e=new THREE.Mesh(SPH,MAT.heronK);e.scale.setScalar(.011);e.position.set(sx*.03,.03,.072);g.add(e);}   // 正面（目のある側）
+  const tents=[];
+  for(let i=0;i<JTN;i++){const geo=new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(JTP*3),3));const l=new THREE.Line(geo,MAT.jellyTent);l.frustumCulled=false;g.add(l);tents.push(l);}
+  scene.add(g);return {g,bell,tents};
+}
+function spawnJelly(){
+  const W=P.pondW,L=P.pondL,M=M_BANK,b=buildJelly();
+  const J={...b,pos:new THREE.Vector3(R(-W/2-M+.3,W/2+M-.3),R(.8,1.4),R(-L/2-M+.3,L/2-.3)),vel:new THREE.Vector3(R(-.08,.08),0,R(-.08,.08)),ph:R(0,6.28),cd:R(3,7),h0:0};
+  J.h0=J.pos.y;JELLY.list.push(J);
+  logEvent('空中をふわふわとクラゲが漂っています','jellyin','このクラゲは空を泳ぎ、長い触手で離れた相手を刺して毒を送り込みます');
+}
+// 刺せる相手（地上の生き物＋飛んでいるカラス）
+function jellyRange(){return 2+.3*skLv('jelly','uniq');}
+function jellyTargets(J){
+  const out=[],rg=jellyRange();
+  // 強くなったクラゲは、空を飛んでいるアオサギもねらう
+  if(jellyStrong()&&(BIRD.st==='arrive'||BIRD.st==='leave')&&BIRD.pos.y>.3&&Math.hypot(BIRD.pos.x-J.pos.x,BIRD.pos.z-J.pos.z)<rg)out.push({h:{o:BIRD,kind:'heronfly'},p:()=>BIRD.pos.clone(),d:0});
+  for(const h of antHosts()){const d=Math.hypot(h.pos.x-J.pos.x,h.pos.z-J.pos.z);if(d<rg)out.push({h,p:()=>new THREE.Vector3(h.pos.x,h.y()+h.h*.6,h.pos.z),d});}
+  for(const c of CROWS.list)if(!c.gone&&!c.leaving){const d=Math.hypot(c.pos.x-J.pos.x,c.pos.z-J.pos.z);if(d<rg)out.push({h:{o:c,kind:'crow'},p:()=>c.pos.clone(),d});}
+  return out;
+}
+// 錯乱した相手が、まわりの仲間に襲いかかる
+function jellyConfuse(h){
+  const o=h.o,nm=h.kind==='crow'?'カラス':hostName(h);
+  if(h.kind==='beast'||h.kind==='croc'){
+    const others=[...BTL.zoo.filter(B=>B!==o&&B.state!=='dead'),...CROC.list.filter(c=>c!==o&&c.st!=='captured')];
+    let best=null,bd=1;for(const e of others){const d=Math.hypot(e.pos.x-o.pos.x,e.pos.z-o.pos.z);if(d<bd){bd=d;best=e;}}
+    if(best){const dmg=R(10,18);if(best.maxHp===undefined){best.maxHp=160*(best.len||1);best.hp=best.maxHp;}best.hp=Math.max(0,best.hp-dmg);best.flash=.4;o.yaw=Math.atan2(best.pos.x-o.pos.x,best.pos.z-o.pos.z);o.atk=.45;
+      logEvent('毒で錯乱した'+nm+'が、仲間の'+(best.nm||'ワニ')+'に襲いかかった！','jellyconf','仲間割れの毒にやられると、敵どうしで争い始めます');}
+    return;
+  }
+  const F=BTL.on?BTL.f.find(x=>x.o===o):null;
+  if(F){const G=BTL.f.find(x=>x!==F&&x.kind!=='crow'&&x.kind!=='heron'&&Math.hypot(fighterPos(x).x-fighterPos(F).x,fighterPos(x).z-fighterPos(F).z)<.8);
+    if(G){hurtFighter(G,R(6,12),null);logEvent('毒で錯乱した'+nm+'が、味方の'+fname(G)+'をたたいてしまった！','jellyconf2');}return;}
+  if(h.kind==='human'&&o.angler&&o.st==='work'){const other=ANG.list.find(a=>a!==o&&a.st==='work');if(other&&typeof startQuarrel==='function'){startQuarrel(o,other);logEvent('毒で錯乱した釣り人が、ほかの釣り人とけんかを始めました','jellyquarrel');}}
+}
+// クラゲが強くなった（触手・毒性・毒の強さ・巨大化の合計が4段以上）
+function jellyStrong(){return skLv('jelly','tent')+skLv('jelly','venom')+skLv('jelly','atk')+skLv('jelly','uniq')>=4;}
+// 刺された鳥は撃ち落とされ、しばらく飛べなくなる
+function groundCrow(c){
+  if(c.grounded>0)return;c.grounded=R(45,75);c.fighting=false;c.carrying=false;
+  if(inPond(c.pos.x,c.pos.z)){c.gone=true;scene.remove(c.g);const i=CROWS.list.indexOf(c);if(i>=0)CROWS.list.splice(i,1);addRipple(c.pos.x,c.pos.z,1.2);logEvent('クラゲに撃ち落とされたカラスが、池に落ちてしまいました','jellycrowpond');return;}
+  logEvent('強くなったクラゲが、飛んでいるカラスを撃ち落としました！しばらく飛べません','jellydown','触手と毒のスキルが育ったクラゲは、空を飛ぶ鳥にも毒を打ち込み、地面に落とします。落とされた鳥はしばらく飛べなくなります');
+}
+function groundHeron(){
+  if(BIRD.grounded>0)return;BIRD.grounded=R(50,80);
+  let x=BIRD.pos.x,z=BIRD.pos.z;
+  if(!onBank(x,z)){const W=P.pondW,L=P.pondL,M=M_BANK;x=clamp(x,-W/2-M+.2,W/2+M-.2);z=clamp(z,-L/2-M+.2,L/2-.2);if(inPond(x,z)){const e=nearestPondEdge({x,z});x=e.x;z=e.z;}}
+  BIRD.pos.set(x,0,z);BIRD.st='stand';BIRD.t=0;if(heron)heron.g.visible=true;
+  logEvent('強くなったクラゲが、空を飛ぶアオサギを撃ち落としました！アオサギはしばらく飛べません','jellyheron','落とされたアオサギは、毒が抜けるまで地上から動けません');
+}
+function venomSpd(o){return o.sleepT>0?0:o.slowT>0?.35:1;}
+// 正面判定：攻撃がクラゲの正面（目のある側 ±65°）から来たら、すべてかわす
+function jellyFront(J,from){const dx=from.x-J.pos.x,dz=from.z-J.pos.z,d=Math.hypot(dx,dz)||1;return (Math.sin(J.yaw||0)*dx+Math.cos(J.yaw||0)*dz)/d>Math.cos(65*Math.PI/180);}
+function jellyDodge(J,from,who){
+  const dx=from.x-J.pos.x,dz=from.z-J.pos.z,d=Math.hypot(dx,dz)||1,sd=rng()<.5?1:-1;
+  J.dodgeT=.35;J.dodgeV=new THREE.Vector3(-dz/d*sd*.9,.15,dx/d*sd*.9);
+  emitSparkles(J.pos.clone(),12,.06,'bubble');skGain('jelly',8,'safe');
+  logEvent('クラゲが正面からの'+who+'を、ひらりとかわしました！','jellydodge','クラゲは正面（目のある側）からの攻撃をすべてかわします。倒すには、背後か横からねらうか、倒れてくる物にはさむしかありません');
+}
+// なぎ倒された木にはさまれる
+function treeCrush(g,base){
+  if(!JELLY.list.length)return;
+  g.updateMatrixWorld(true);const tip=g.localToWorld(new THREE.Vector3(0,1.15,0)),a=new THREE.Vector3(base.x,.15,base.z),ab=new THREE.Vector3().subVectors(tip,a),L2=ab.lengthSq()||1;
+  for(const J of JELLY.list.slice()){const t=clamp(new THREE.Vector3().subVectors(J.pos,a).dot(ab)/L2,0,1),q=a.clone().addScaledVector(ab,t);
+    if(q.distanceTo(J.pos)<.28){emitSparkles(J.pos.clone(),26,.1,'bubble');jellyPop(J);JELLY.list.splice(JELLY.list.indexOf(J),1);skGain('jelly',40,'death');
+      JELLY.stings=JELLY.stings.filter(S=>{if(JELLY.list.includes(S.J))return true;scene.remove(S.line);return false;});
+      logEvent('なぎ倒された木にはさまれて、クラゲがつぶれました！','jellycrush','正面の攻撃をかわすクラゲも、倒れてくる木からは逃げられません');}}
+}
+function jellyPoison(h){
+  const o=h.o;if(JELLY.poison.some(x=>x.h.o===o))return;
+  const vl=skLv('jelly','venom'),effs=['dmg'];if(vl>=1)effs.push('slow');if(vl>=2)effs.push('sleep');if(vl>=3)effs.push('toxic');if(vl>=4)effs.push('confuse');
+  const eff=effs.length>1&&rng()<.75?pick(effs.slice(1)):'dmg',k=vl>=5?1.5:1;
+  JELLY.poison.push({h,t:R(6,10)*k,itch:0,eff,k,cT:1});
+  if(jellyStrong()){if(h.kind==='crow'&&o.pos.y>.15&&!(o.grounded>0))groundCrow(o);else if(h.kind==='heronfly'){groundHeron();return;}}
+  const nm=h.kind==='crow'?'カラス':hostName(h);
+  const EN={slow:'動きが鈍くなる毒',sleep:'眠ってしまう毒',toxic:'猛毒',confuse:'錯乱して仲間割れする毒'};
+  if(EN[eff])logEvent('クラゲの'+EN[eff]+'が'+nm+'に回りました！','jellyeff'+eff,'スキル「毒性」の段が上がると、鈍化・眠り・猛毒・仲間割れの毒を使い分けるようになります');
+  logEvent('クラゲが長い触手を伸ばし、'+nm+'を刺しました！毒が回っていきます','jellysting','刺された生き物は、しばらくのあいだ毒で体力を奪われます。小さな生き物は命を落とすこともあります');
+}
+function updateJelly(dt){
+  const want=[0,3,6][P.jelly]||0;
+  if(JELLY.list.length<want&&rng()<dt*.3)spawnJelly();
+  while(JELLY.list.length>want){const J=JELLY.list.pop();scene.remove(J.g);}
+  const W=P.pondW,L=P.pondL,M=M_BANK,tt=U.uTime.value;
+  for(const J of JELLY.list){
+    // ふわふわ漂う（縁で向きを変える）
+    J.pos.addScaledVector(J.vel,dt);J.ph+=dt;
+    if(J.pos.x<-W/2-M+.2||J.pos.x>W/2+M-.2)J.vel.x*=-1;if(J.pos.z<-L/2-M+.2||J.pos.z>L/2-.2)J.vel.z*=-1;
+    if(rng()<dt*.2){J.vel.x+=R(-.03,.03);J.vel.z+=R(-.03,.03);J.vel.clampLength(0,.12);}
+    J.pos.y=J.h0+Math.sin(J.ph*.8)*.08;
+    // 進む方向へゆっくり向きを変える（正面＝目のある側）
+    if(J.yaw===undefined)J.yaw=R(0,6.28);
+    if(J.vel.x*J.vel.x+J.vel.z*J.vel.z>1e-4&&!(J.faceT>0)){let dy=Math.atan2(J.vel.x,J.vel.z)-J.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));J.yaw+=clamp(dy,-.7*dt,.7*dt);}
+    if(J.faceT>0)J.faceT-=dt;
+    if(J.dodgeT>0){J.dodgeT-=dt;J.pos.addScaledVector(J.dodgeV,dt);if(rng()<dt*30)emitSparkles(J.pos.clone(),2,.04,'bubble');}
+    J.g.rotation.y=J.yaw;
+    const pulse=1+Math.sin(J.ph*3)*.12;J.g.position.copy(J.pos);J.bell.scale.set(.09*pulse,.07/pulse,.09*pulse);
+    // 触手の本数（スキル「触手」で増える）と体の大きさ（巨大化）
+    while(J.tents.length<JTN+2*skLv('jelly','tent')){const geo=new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(JTP*3),3));const l=new THREE.Line(geo,MAT.jellyTent);l.frustumCulled=false;J.g.add(l);J.tents.push(l);}
+    J.g.scale.setScalar(1+.25*skLv('jelly','uniq'));
+    // 触手がゆらゆら
+    J.tents.forEach((l,i)=>{const a=i/J.tents.length*Math.PI*2,pa=l.geometry.attributes.position,arr=pa.array;
+      for(let k=0;k<JTP;k++){const q=k/(JTP-1);arr[k*3]=Math.cos(a)*.05*(1-q*.5)+Math.sin(tt*2+i+q*4)*.02*q;arr[k*3+1]=-q*.32;arr[k*3+2]=Math.sin(a)*.05*(1-q*.5)+Math.cos(tt*2.3+i+q*4)*.02*q;}
+      pa.needsUpdate=true;});
+    // 長距離の刺突
+    if((J.cd-=dt)<=0){
+      J.cd=R(4,8);const ts=jellyTargets(J);
+      const n=Math.min(ts.length,1+skLv('jelly','tent'));ts.sort(()=>rng()-.5);
+      for(const t of ts.slice(0,n)){const geo=new THREE.BufferGeometry().setFromPoints([J.pos.clone(),J.pos.clone()]);const line=new THREE.Line(geo,MAT.jellySting);line.frustumCulled=false;scene.add(line);JELLY.stings.push({J,t,line,k:0,hit:false});}
+    }
+  }
+  // 触手が伸びて刺さり、戻っていく
+  for(let i=JELLY.stings.length-1;i>=0;i--){
+    const S=JELLY.stings[i];S.k+=dt;const from=v1.copy(S.J.pos);from.y-=.05;
+    const to=S.t.p(),ext=S.k<.3?S.k/.3:S.k<.6?1:Math.max(0,1-(S.k-.6)/.25);
+    const pa=S.line.geometry.attributes.position;pa.setXYZ(0,from.x,from.y,from.z);pa.setXYZ(1,lerp(from.x,to.x,ext),lerp(from.y,to.y,ext),lerp(from.z,to.z,ext));pa.needsUpdate=true;
+    if(S.k>=.3&&!S.hit){S.hit=true;jellyPoison(S.t.h);skGain('jelly',5,'hit');emitSparkles(to,8,.05,'bubble');}
+    if(S.k>=.85||!JELLY.list.includes(S.J)){scene.remove(S.line);S.line.geometry.dispose();JELLY.stings.splice(i,1);}
+  }
+  // 毒の効果
+  for(let i=JELLY.poison.length-1;i>=0;i--){
+    const Pz=JELLY.poison[i],h=Pz.h,o=h.o;Pz.t-=dt;
+    const alive=h.kind==='crow'?(!o.gone&&CROWS.list.includes(o)):hostAliveA(h);
+    if(!alive){o.slowT=0;o.sleepT=0;JELLY.poison.splice(i,1);continue;}
+    if(rng()<dt*4){const p=h.kind==='crow'?o.pos:new THREE.Vector3(h.pos.x,h.y()+h.h*.5,h.pos.z);emitSparkles(v2.copy(p),2,.03,'bubble');}
+    const F=BTL.on?BTL.f.find(x=>x.o===o):null,dm=(Pz.eff==='toxic'?2.5:1)*Pz.k*(1+.1*skLv('jelly','atk'));
+    // 鈍化・眠り
+    o.slowT=Pz.eff==='slow'?Pz.t:0;o.sleepT=Pz.eff==='sleep'?Pz.t:0;
+    if(Pz.eff==='sleep'){if(h.kind==='beast'||h.kind==='croc')o.heldT=Math.max(o.heldT||0,.2);if(rng()<dt*2){const p=h.kind==='crow'?o.pos:new THREE.Vector3(h.pos.x,h.y()+h.h+.05,h.pos.z);emitSparkles(v2.copy(p),1,.03,'bubble');}}
+    // 仲間割れ：錯乱して、近くの味方に襲いかかる
+    if(Pz.eff==='confuse'&&(Pz.cT-=dt)<=0){Pz.cT=1;jellyConfuse(h);}
+    if(F){F.hp=Math.max(0,F.hp-3*dm*dt);F.flash=Math.max(F.flash,.1);}
+    else if(h.kind==='beast'||h.kind==='croc'){if(o.maxHp===undefined){o.maxHp=160*(o.len||1);o.hp=o.maxHp;}o.hp=Math.max(0,o.hp-skTake(o,4*dm*dt));}
+    else if(['human','cat','dog','heron'].includes(h.kind)){Pz.itch+=dt;if(Pz.itch>4){Pz.itch=-99;
+      if(h.kind==='human')humanLeave(undefined,o);else if(h.kind==='cat')catLeave(true);else if(h.kind==='dog')dogLeave();else birdLeave();
+      logEvent('クラゲの毒が回り、'+hostName(h)+'がふらふらと去っていきました','jellyflee');}}
+    if(Pz.t<=0){
+      if(h.kind==='crit'&&rng()<.6){killCrit(o);logEvent('クラゲの毒で、'+hostName(h)+'が力尽きました','jellykill');}
+      else if(h.kind==='fish'&&rng()<.6)o.die('eaten');
+      else if(h.kind==='crow'&&rng()<.4){o.gone=true;scene.remove(o.g);const j=CROWS.list.indexOf(o);if(j>=0)CROWS.list.splice(j,1);logEvent('クラゲの毒で、カラスが落ちていきました','jellycrow');}
+      o.slowT=0;o.sleepT=0;JELLY.poison.splice(i,1);
+    }
+  }
+  for(const J of JELLY.list)skGain('jelly',dt*.1,'live');
+  if(BIRD.grounded>0){BIRD.grounded-=dt;if(BIRD.grounded<=0)logEvent('毒が抜けて、アオサギがまた飛べるようになりました','heronfly');}
+}
+/* ============ クラゲ退治の猟師：クラゲがしばらく居座ると、猟師がやって来て撃ち落とす ============ */
+const JH={det:0,need:R(35,55),h:null};
+function buildJellyHunter(){
+  const g=buildHuman(),u=g.userData;
+  g.traverse(o=>{if(o.isMesh&&o.material===MAT.hShirt)o.material=MAT.hunterVest;});
+  const rifle=new THREE.Group();mk(rifle,CYL,MAT.rifle,.006,.5,.006,0,.2,0);mk(rifle,CYL,MAT.hWood,.014,.14,.01,0,-.02,0);mk(rifle,CYL,MAT.rifle,.012,.12,.012,.018,.27,0);rifle.rotation.x=3.02;u.arms[0].hand.add(rifle);
+  const muzzle=new THREE.Object3D();muzzle.position.y=.45;rifle.add(muzzle);
+  const tg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const tracer=new THREE.Line(tg,new THREE.LineBasicMaterial({color:'#ffe08a',transparent:true,opacity:.9}));tracer.frustumCulled=false;tracer.visible=false;scene.add(tracer);
+  u.rod.visible=false;u.axe.visible=false;u.basket.visible=false;u.bucket.visible=false;g.visible=true;
+  return {g,muzzle,tracer};
+}
+// いちばん多くのクラゲをまとめて撃ち抜ける向きを探す
+function bestJellyLine(mz){
+  let best=null,bn=0;
+  for(const J of JELLY.list){const end=mz.clone().addScaledVector(new THREE.Vector3().subVectors(J.pos,mz).normalize(),7);const n=jellyOnLine(mz,end).length;if(n>bn){bn=n;best=J.pos.clone();}}
+  return best;
+}
+function updateJellyHunter(dt){
+  const ed=P.eco?dt*P.ecoSpeed:0;
+  // クラゲを感知している時間
+  if(JELLY.list.length)JH.det+=ed;else JH.det=Math.max(0,JH.det-ed*2);
+  if(!JH.h){
+    if(P.hunter&&JH.det>=JH.need&&JELLY.list.length){
+      const b=buildJellyHunter(),p=outerBankPoint(),spot=randomBankPoint(.4)||p.clone();
+      JH.h={...b,pos:p.clone(),yaw:0,walk:0,st:'in',spot:new THREE.Vector3(spot.x,0,spot.z),cd:1.2,t:0,shots:0,idle:0,trT:0};
+      JH.det=0;JH.need=R(35,55);
+      logEvent('居座るクラゲを見かねて、猟師がクラゲ退治にやって来ました！','jhunter','クラゲが長くいると、猟師が呼ばれます。猟銃の弾はクラゲを突き抜け、一列に並んだクラゲをまとめて撃ち落とします');
+    }
+    return;
+  }
+  const H=JH.h,u=H.g.userData;H.t+=dt;
+  if(H.trT>0){H.trT-=dt;if(H.trT<=0)H.tracer.visible=false;}
+  let walking=false,aim=false;
+  if(H.st==='in'){if(humanWalk(H.spot,dt,.5,H)<.05)H.st='hunt';else walking=true;}
+  else if(H.st==='hunt'){
+    if(!JELLY.list.length){H.idle+=dt;if(H.idle>3||H.t>90){H.st='out';H.exit=outerBankPoint();logEvent('クラゲ退治を終えた猟師が帰っていきます（'+H.shots+'発）','jhunterend');}}
+    else{
+      H.idle=0;aim=true;
+      const tgt=JELLY.list.reduce((a,J)=>Math.hypot(J.pos.x-H.pos.x,J.pos.z-H.pos.z)<Math.hypot(a.pos.x-H.pos.x,a.pos.z-H.pos.z)?J:a);
+      H.yaw=Math.atan2(tgt.pos.x-H.pos.x,tgt.pos.z-H.pos.z);
+      if((H.cd-=dt)<=0){
+        H.cd=R(2.2,3.2);H.g.updateMatrixWorld(true);const mz=new THREE.Vector3();H.muzzle.getWorldPosition(mz);
+        const aimP=bestJellyLine(mz)||tgt.pos.clone(),end=mz.clone().addScaledVector(new THREE.Vector3().subVectors(aimP,mz).normalize(),7);
+        H.yaw=Math.atan2(aimP.x-H.pos.x,aimP.z-H.pos.z);
+        gunFX(H,mz,aimP);H.shots++;
+        if(!jellySnipe(mz,aimP,true))logEvent('猟師の弾はクラゲをかすめました','jhuntmiss');
+        const pa=H.tracer.geometry.attributes.position;pa.setXYZ(0,mz.x,mz.y,mz.z);pa.setXYZ(1,end.x,end.y,end.z);pa.needsUpdate=true;H.tracer.visible=true;H.trT=.12;
+      }
+    }
+  }
+  else if(H.st==='out'){if(humanWalk(H.exit,dt,.5,H)<.06){scene.remove(H.g);scene.remove(H.tracer);JH.h=null;return;}walking=true;}
+  // 姿勢：歩く／上空へ銃を構える
+  H.g.position.set(H.pos.x,standH(H.pos.x,H.pos.z),H.pos.z);H.g.rotation.y=H.yaw;
+  const sw=walking?Math.sin(H.walk):0,A=u.arms;
+  u.legs[0].rotation.x=sw*.55;u.legs[1].rotation.x=-sw*.55;
+  if(aim){A[0].sh.rotation.x=-2.3;A[1].sh.rotation.x=-2.1;A[0].el.rotation.x=0;A[1].el.rotation.x=-.4;}
+  else{A[0].sh.rotation.x=-sw*.4;A[1].sh.rotation.x=sw*.4;A[0].el.rotation.x=0;A[1].el.rotation.x=0;}
+  if(H.recoil>0){H.recoil-=dt;const k=H.recoil/.3;A[0].sh.rotation.x+=.55*k;A[1].sh.rotation.x+=.4*k;u.body.rotation.x=-.15*k;}else u.body.rotation.x=0;
+}
+/* ============ 演出：猟銃の発射（マズルフラッシュ・反動・硝煙） ／ クラゲの防御シールド ============ */
+const GFX={list:[]};
+MAT.flash=new THREE.MeshBasicMaterial({color:'#fff2b0',transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false});
+MAT.shield=new THREE.MeshBasicMaterial({color:'#5cc8f0',transparent:true,opacity:.2,depthWrite:false,side:THREE.FrontSide});
+MAT.shieldWire=new THREE.MeshBasicMaterial({color:'#bff0ff',transparent:true,opacity:.55,wireframe:true,depthWrite:false});
+const SHIELD_GEO=new THREE.IcosahedronGeometry(1,1);
+function gunFX(H,mz,aim){
+  const g=new THREE.Group();g.position.copy(mz);
+  const ball=new THREE.Mesh(SPH,MAT.flash.clone());ball.scale.setScalar(.045);g.add(ball);
+  const cone=new THREE.Mesh(CONE,MAT.flash.clone());cone.scale.set(.035,.2,.035);cone.position.y=.1;
+  const dir=new THREE.Vector3().subVectors(aim,mz).normalize();const pivot=new THREE.Group();pivot.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);pivot.add(cone);g.add(pivot);
+  const light=new THREE.PointLight('#ffd27a',3,1.6);g.add(light);
+  g.renderOrder=32;scene.add(g);GFX.list.push({g,t:0,life:.14,kind:'flash',mats:[ball.material,cone.material],light});
+  for(let k=0;k<3;k++)puff(mz.x+dir.x*.05*k,mz.y+dir.y*.05*k,mz.z+dir.z*.05*k,.02+.01*k);   // 硝煙
+  emitSparkles(mz.clone(),10,.05,'dirt');
+  if(H)H.recoil=.3;   // 反動
+}
+function shieldFX(J){
+  const g=new THREE.Group();const s=new THREE.Mesh(SPH,MAT.shield.clone()),w=new THREE.Mesh(SHIELD_GEO,MAT.shieldWire.clone());g.add(s);g.add(w);
+  g.renderOrder=31;scene.add(g);GFX.list.push({g,t:0,life:.8,kind:'shield',J,mats:[s.material,w.material]});
+}
+// クラゲがやられる：風船が割れるように、ぷくっとふくらんでから弾け飛ぶ
+const POP_GEO=new THREE.PlaneGeometry(1,1);
+function jellyPop(J){
+  const p=J.pos.clone(),sc=J.g.scale.x||1;scene.remove(J.g);
+  const g=new THREE.Group();g.position.copy(p);scene.add(g);
+  // ふくらむ傘
+  const bubble=new THREE.Mesh(new THREE.SphereGeometry(1,16,10,0,Math.PI*2,0,Math.PI/2),MAT.jellyBell.clone());bubble.scale.set(.09*sc,.07*sc,.09*sc);g.add(bubble);
+  // 破片（傘の膜）
+  const bits=[];for(let i=0;i<18;i++){const m=new THREE.Mesh(POP_GEO,MAT.jellyBell.clone());m.material.side=THREE.DoubleSide;m.scale.setScalar(R(.02,.045)*sc);m.visible=false;g.add(m);
+    const a=R(0,6.28),u=R(-.3,1);bits.push({m,v:new THREE.Vector3(Math.cos(a)*R(.6,1.3),u*.9+.3,Math.sin(a)*R(.6,1.3)),r:new THREE.Vector3(R(-12,12),R(-12,12),R(-12,12))});}
+  // 衝撃の輪とフラッシュ
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.8,1,32),MAT.flash.clone());ring.material.side=THREE.DoubleSide;ring.scale.setScalar(.01);ring.lookAt(camera.position.clone().sub(p).add(p));g.add(ring);
+  const fl=new THREE.Mesh(SPH,MAT.flash.clone());fl.scale.setScalar(.01);g.add(fl);
+  g.renderOrder=33;GFX.list.push({g,t:0,life:1.1,kind:'pop',bubble,bits,ring,fl,mats:[bubble.material,ring.material,fl.material,...bits.map(b=>b.m.material)]});
+}
+function updateGFX(dt){
+  for(let i=GFX.list.length-1;i>=0;i--){
+    const e=GFX.list[i];e.t+=dt;const k=Math.min(1,e.t/e.life);
+    if(e.kind==='pop'){
+      if(e.t<.12){const q=e.t/.12;e.bubble.scale.multiplyScalar(1+dt*3.5);e.bubble.material.opacity=.55+.3*q;}   // ぷくっとふくらむ
+      else{
+        if(e.bubble.visible){e.bubble.visible=false;for(const b of e.bits)b.m.visible=true;emitSparkles(e.g.position.clone(),20,.12,'bubble');}   // パンッ！
+        const q=(e.t-.12)/(e.life-.12);
+        for(const b of e.bits){b.v.y-=2.2*dt;b.m.position.addScaledVector(b.v,dt);b.m.rotation.x+=b.r.x*dt;b.m.rotation.y+=b.r.y*dt;b.m.material.opacity=.6*(1-q);}
+        e.ring.scale.setScalar(.05+q*.5);e.ring.material.opacity=Math.max(0,.9*(1-q*2.2));
+        e.fl.scale.setScalar(.03+Math.min(1,q*6)*.12);e.fl.material.opacity=Math.max(0,1-q*5);
+      }
+    }
+    else if(e.kind==='flash'){e.g.scale.setScalar(1+k*.6);e.mats[0].opacity=e.mats[1].opacity=1-k;e.light.intensity=3*(1-k);}
+    else{const sc=(.16+.06*Math.sin(k*Math.PI))*(e.J&&e.J.g?e.J.g.scale.x:1);if(e.J)e.g.position.copy(e.J.pos);e.g.scale.setScalar(sc);e.g.rotation.y+=dt*2;e.mats[0].opacity=.2*(1-k*k);e.mats[1].opacity=.55*(1-k);}
+    if(k>=1){scene.remove(e.g);for(const m of e.mats)m.dispose();GFX.list.splice(i,1);}
+  }
 }
 function updateInvasives(dt){
   const ed=P.eco?dt*P.ecoSpeed:0,tt=U.uTime.value,D=P.pondD;
@@ -8804,7 +9421,7 @@ function applyTime(){
   }
   if(Math.abs(t-envTime)>.2||envDirty)refreshEnv();
   const label=hhmm(t);
-  const ckey=label+RAIN.season+(RAIN.amt>.2?1:0);if(ckey!==lastClock){lastClock=ckey;const per=PERIOD.find(p=>t<p[0])[1];clockEl.innerHTML='<b>'+label+'</b>'+per+(RAIN.season==='rainy'?'・雨季':'・乾季')+(RAIN.amt>.2?'（雨）':'');}
+  const ckey=label+RAIN.season+(RAIN.amt>.2?1:0)+seasonInfo().txt;if(ckey!==lastClock){lastClock=ckey;const per=PERIOD.find(p=>t<p[0])[1];clockEl.innerHTML='<b>'+label+'</b>'+per+(()=>{const si=seasonInfo();return si.wet?'・<span class="seas wet">雨季▲増水期</span>（'+si.txt+'）':'・<span class="seas dry">乾季▼渇水期</span>（'+si.txt+'）';})()+(RAIN.amt>.2?'（雨）':'');}
 }
 
 /* ============ UI ============ */
@@ -8814,7 +9431,7 @@ const SCHEMA=[
   {title:'生態系',open:true,items:[
     ['stats','stats'],
     ['check','eco','生態系シミュレーション'],
-    ['select','toastMode','中央のトピック',[['first','初めての出来事だけ'],['always','毎回表示'],['off','表示しない']]],
+    ['select','toastMode','中央のトピック',[['first','初めての出来事だけ'],['always','毎回表示'],['off','表示しない']]],['select','randomTopics','ランダムトピック（豆知識・いまのようす）',[['0','出さない'],['1','ときどき'],['2','よく出す']]],['button','randomTopicNow','今すぐランダムトピック'],
     ['select','topicStyle','トピックの内容',[['explain','解説'],['trivia','豆知識'],['live','実況'],['voice','生き物のひとこと'],['news','ニュース速報'],['quiz','〇×クイズ'],['diary','観察日記'],['senryu','川柳'],['random','いろいろ混ぜる']]],
     ['select','feeder','自動のエサやり',[['0','なし（飢えやすい）'],['1','少なめ'],['2','普通'],['3','たっぷり']]],
     ['range','ecoSpeed','時間の流れ（世代交代の速さ）',.5,6,.25,fmtX],
@@ -8836,11 +9453,11 @@ const SCHEMA=[
     ['button','gcIntro','運び屋寄生虫を持ち込む（3匹）'],
     ['select','frogs','カエル',[['0','いない'],['1','少し'],['2','たくさん']]],
     ['select','crabs','サワガニ',[['0','いない'],['1','少し'],['2','たくさん']]],
-    ['select','moles','モグラ（前面の地層で暮らす）',[['0','いない'],['1','少し'],['2','たくさん']]],
+    ['select','moles','モグラ（前面の地層で暮らす）',[['0','いない'],['1','少し'],['2','たくさん']]],['select','moleBoom','モグラの爆発（地面に大穴）',[['0','しない'],['1','まれに'],['2','ときどき']]],['button','moleBoomNow','今すぐモグラを爆発させる'],
     ['select','cats','猫',[['0','来ない'],['1','ときどき来る'],['2','よく来る']]],
     ['select','dogs','犬',[['0','来ない'],['1','ときどき来る'],['2','よく来る']]],
     ['button','callCat','今すぐ猫を呼ぶ'],['button','callDog','今すぐ犬を呼ぶ'],
-    ['select','crows','カラス（群れで行動）',[['0','来ない'],['1','ときどき来る'],['2','よく来る']]],['select','crowAggro','カラスが勝てる相手を手当たり次第に襲う',[['0','オフ'],['1','オン']]],['select','heronBeam','アオサギが口からビームを出す',[['0','出さない'],['1','出す']]],['button','callCrows','今すぐカラスを呼ぶ'],
+    ['select','crows','カラス（群れで行動）',[['0','来ない'],['1','ときどき来る'],['2','よく来る']]],['select','crowAggro','カラスが勝てる相手を手当たり次第に襲う',[['0','オフ'],['1','オン']]],['select','crowThrow','カラスがモグラを投げつける（戦いの中）',[['0','しない'],['1','する']]],['select','heronBeam','アオサギが口からビームを出す',[['0','出さない'],['1','出す']]],['select','jelly','空飛ぶクラゲ（毒の触手）',[['0','いない'],['1','少し（3匹）'],['2','多い（6匹）']]],['button','callCrows','今すぐカラスを呼ぶ'],
     ['select','ants','アリのコロニー（地中）',[['0','なし'],['1','あり']]],['button','newColony','アリのコロニーを作り直す'],['button','antVisit','外からアリを呼ぶ'],
     ['select','smoking','釣り人のタバコ（ポイ捨てあり）',[['0','吸わない'],['1','吸う']]],['select','fire','晴れの日の火事',[['0','起こらない'],['1','起こる']]],['select','poacher','毛皮目当てに動物園の動物を逃がす',[['0','しない'],['1','たまに'],['2','よく']]],['button','poachNow','今すぐ動物を逃がさせる'],['button','skillTree','スキルツリー'],['button','fireNow','今すぐ火事を起こす'],
     ['select','humans','人間（釣り・木こり・木の実採り）',[['0','来ない'],['1','たまに来る'],['2','よく来る']]],['button','callHuman','今すぐ人間を呼ぶ']
@@ -8910,7 +9527,7 @@ const ON={
   pondW:rebuildPondD,pondL:rebuildPondD,pondD:rebuildPondD,
   water:applyWater,clarity:applyWater,waves:()=>{U.uWave.value=P.waves;},
   ribbons:()=>syncPlantSpecies('rib',P.ribbons),anacharis:()=>syncPlantSpecies('ana',P.anacharis),lotus:()=>syncPlantSpecies('lotus',P.lotus),
-  weasel:()=>{P.weasel=+P.weasel;},fluke:()=>{P.fluke=+P.fluke;},frogs:()=>{P.frogs=+P.frogs;},crabs:()=>{P.crabs=+P.crabs;},moles:()=>{P.moles=+P.moles;},cats:()=>{P.cats=+P.cats;},crows:()=>{P.crows=+P.crows;},greatDry:()=>{P.greatDry=+P.greatDry;},greatFlood:()=>{P.greatFlood=+P.greatFlood;},waves:()=>{P.waves=+P.waves;},greatDryNow:()=>{if(!startGreatDry())logEvent('すでに大乾季です');},greatFloodNow:()=>{if(!startGreatFlood())logEvent('すでに大洪水です');},waveNow:()=>{if(!startWave())logEvent('水位が池より高いときだけ波が起きます');},crowAggro:()=>{P.crowAggro=+P.crowAggro;},heronBeam:()=>{P.heronBeam=+P.heronBeam;},ants:()=>{P.ants=+P.ants;foundColony();},newColony:()=>{if(!P.ants){P.ants=1;document.getElementById('ui-ants').value='1';}foundColony();},
+  weasel:()=>{P.weasel=+P.weasel;},fluke:()=>{P.fluke=+P.fluke;},frogs:()=>{P.frogs=+P.frogs;},crabs:()=>{P.crabs=+P.crabs;},moles:()=>{P.moles=+P.moles;},cats:()=>{P.cats=+P.cats;},crows:()=>{P.crows=+P.crows;},greatDry:()=>{P.greatDry=+P.greatDry;},greatFlood:()=>{P.greatFlood=+P.greatFlood;},waves:()=>{P.waves=+P.waves;},greatDryNow:()=>{if(!startGreatDry())logEvent('すでに大乾季です');},greatFloodNow:()=>{if(!startGreatFlood())logEvent('すでに大洪水です');},waveNow:()=>{if(!startWave())logEvent('水位が池より高いときだけ波が起きます');},crowAggro:()=>{P.crowAggro=+P.crowAggro;},randomTopics:()=>{P.randomTopics=+P.randomTopics;},randomTopicNow:()=>{randomTopic();},crowThrow:()=>{P.crowThrow=+P.crowThrow;},moleBoom:()=>{P.moleBoom=+P.moleBoom;},moleBoomNow:()=>{const m=pick(MOLE.list);if(m)moleBoom(m);else logEvent('いまはモグラがいません');},heronBeam:()=>{P.heronBeam=+P.heronBeam;},jelly:()=>{P.jelly=+P.jelly;},ants:()=>{P.ants=+P.ants;foundColony();},newColony:()=>{if(!P.ants){P.ants=1;document.getElementById('ui-ants').value='1';}foundColony();},
   gcarrier:()=>{P.gcarrier=+P.gcarrier;},gcIntro:()=>{if(!P.gcarrier){P.gcarrier=1;document.getElementById('ui-gcarrier').value='1';}gcIntroduce();logEvent('運び屋寄生虫が持ち込まれました','gcintro','寄生された生き物を食べた個体は、低い確率で寄生元の特性を取り込みます。紫に光る粒が目印です');},
   humans:()=>{P.humans=+P.humans;if(!P.humans)humanLeave();else if(HUMAN.st==='away')HUMAN.t=Math.min(HUMAN.t,humanInterval());},callHuman:()=>{if(!startHuman())logEvent('人間は今は来られません（作業がないか、来ている最中です）');},
   antVisit:()=>{if(!P.ants){P.ants=1;document.getElementById('ui-ants').value='1';}ANTV.t=0;},
@@ -9027,7 +9644,7 @@ function frame(now){
   applyTime();
   for(const f of fishes)f.update(dt);
   for(let i=fishes.length-1;i>=0;i--)if(fishes[i].gone)fishes.splice(i,1);
-  updateDays(dt);updateDrought(dt);updateFloodEvent(dt);updateFloodSwim(dt);updateBoats(dt);updateOverflow(dt);updateTerrain(dt);updateMud(dt);updateBirdPop(dt);updateAnglers(dt);updateEggs(dt);updatePlants(dt);updateLandPlants(dt);updateFeeder(dt);updateBird(dt);updateBugs(dt);updateProj(dt);updateCrits(dt);updateWeasel(dt);updateMoles(dt);updateNuts(dt);updateCat(dt);updateDog(dt);updateRain(dt);updateCrows(dt);updateAnts(dt);updateInvasives(dt);updateHera(dt);updateGeneParasite(dt);updateHuman(dt);updateAntArrivals(dt);updateRiver(dt);updateRefuge(dt);updateCrocs(dt);updateBattle(dt);updateSwallow(dt);updateButts(dt);updateFire(dt);updateSmoke(dt);updatePoacher(dt);updatePassengers(dt);updateSkills(dt);updateGreat(dt);updateWaves(dt);updateBuster(dt);updateTreeAging(dt);updateProj(dt);updateBeams(dt);updateSweep(dt);updateEdgeFall(dt);if((COVER.t-=dt)<0){COVER.t=.5;COVER.pts=collectCover();}
+  updateDays(dt);updateDrought(dt);updateFloodEvent(dt);updateFloodSwim(dt);updateBoats(dt);updateOverflow(dt);updateTerrain(dt);updateMud(dt);updateBirdPop(dt);updateAnglers(dt);updateEggs(dt);updatePlants(dt);updateLandPlants(dt);updateFeeder(dt);updateBird(dt);updateBugs(dt);updateProj(dt);updateCrits(dt);updateWeasel(dt);updateMoles(dt);updateNuts(dt);updateCat(dt);updateDog(dt);updateRain(dt);updateCrows(dt);updateAnts(dt);updateInvasives(dt);updateHera(dt);updateGeneParasite(dt);updateHuman(dt);updateAntArrivals(dt);updateRiver(dt);updateRefuge(dt);updateCrocs(dt);updateBattle(dt);updateSwallow(dt);updateButts(dt);updateFire(dt);updateSmoke(dt);updatePoacher(dt);updatePassengers(dt);updateSkills(dt);updateGreat(dt);updateWaves(dt);updateBuster(dt);updateTreeAging(dt);updateProj(dt);updateBeams(dt);updateSweep(dt);updateMoleBoom(dt);updateCrowThrow(dt);updateMolePara(dt);updateRandomTopics(dt);updateTopple(dt);updateJelly(dt);updateJellyHunter(dt);updateGFX(dt);updateEdgeFall(dt);if((COVER.t-=dt)<0){COVER.t=.5;COVER.pts=collectCover();}
   updateFood(dt);updateSparkles(dt);updateStats(dt);
   const tt=U.uTime.value;
   for(const l of ENV.lilyList){l.m.position.y=l.y+(U.uWaterY.value+.05)+Math.sin(tt*.8+l.ph)*.0015;l.m.rotation.y+=Math.sin(tt*.3+l.ph)*.0003;}
@@ -9050,7 +9667,7 @@ function frame(now){
 requestAnimationFrame(frame);
 // 確認用：画面が隠れていても時間を進められる（__step(コマ数)）
 window.__step=n=>{frame.manual=true;let t=performance.now();for(let i=0;i<n;i++){t+=33;frame(t);}frame.manual=false;last=performance.now();};
-window.__hako={P,fishes,scene,renderer,camera,controls,ECO,Fish,BIRD,startBirdArrive,infectRandom,BUGS,CRIT,WEASEL,startWeasel,MOLE,infectFluke,breachPond,flood3From,isWet3,PET,NUT,FLOOD,startCat,startDog,shakeTree,RAIN,makeOak,CROWS,startCrows,LANDP,ANTS,INV,addInv,gcSeed,gcEat,gcAcquire,gcCount,GC_SRC,HUMAN,startHuman,ANTV,makeKaki,addPetKid,petFamilyArrive,RIVER,inRiver,DRY,sizeRisk,ANG,startAnglers,HER,CRW,OVF,TERR,groundH,HERA,addHera,FLOODEV,startFloodEvent,HIGHW,startHighWater,FSW,BOATS,startBoat,CROC,startCroc,BTL,startBattle,summonBeast,MUD,mudF,updateMud,updateBattle,fightingBeasts,FIRE,startFire,BUTTS,HK,poacherRelease,earnPelt,summonHunter,HUNT,PASS,acidSwallow,broodLay,crisisLevel,INV,fishes,SK,skGain,skLv,openSkills,skTotal,CRIT,killCrit,gcEat,BIRD,sinkBoat,CROWS,crowAggroTarget,crowPower,FALL,PET,GREAT,startGreatDry,startGreatFlood,startWave,WAVE,applyWaterLevel,BUSTER,busterStart,NUT,treeTrunks,ENV,WOOD,FAC,facJob,growExp,skEType,ANTS,MOLE,antHosts,HPROJ,HSTYLE,BEAM,heronBeam,startBirdArrive,SWEEP};
+window.__hako={P,fishes,scene,renderer,camera,controls,ECO,Fish,BIRD,startBirdArrive,infectRandom,BUGS,CRIT,WEASEL,startWeasel,MOLE,infectFluke,breachPond,flood3From,isWet3,PET,NUT,FLOOD,startCat,startDog,shakeTree,RAIN,makeOak,CROWS,startCrows,LANDP,ANTS,INV,addInv,gcSeed,gcEat,gcAcquire,gcCount,GC_SRC,HUMAN,startHuman,ANTV,makeKaki,addPetKid,petFamilyArrive,RIVER,inRiver,DRY,sizeRisk,ANG,startAnglers,HER,CRW,OVF,TERR,groundH,HERA,addHera,FLOODEV,startFloodEvent,HIGHW,startHighWater,FSW,BOATS,startBoat,CROC,startCroc,BTL,startBattle,summonBeast,MUD,mudF,updateMud,updateBattle,fightingBeasts,FIRE,startFire,BUTTS,HK,poacherRelease,earnPelt,summonHunter,HUNT,PASS,acidSwallow,broodLay,crisisLevel,INV,fishes,SK,skGain,skLv,openSkills,skTotal,CRIT,killCrit,gcEat,BIRD,sinkBoat,CROWS,crowAggroTarget,crowPower,FALL,PET,GREAT,startGreatDry,startGreatFlood,startWave,WAVE,applyWaterLevel,BUSTER,busterStart,NUT,treeTrunks,ENV,WOOD,FAC,facJob,growExp,skEType,ANTS,MOLE,antHosts,HPROJ,HSTYLE,BEAM,heronBeam,startBirdArrive,SWEEP,moleBoom,TERR,CTHROW,boomAt,moleInfect,randomTopic,rtState,RTOPIC,JH,GFX,jellyPop,jellyFront,treeCrush,toppleTree,gunFX,shieldFX,jellySnipe,jellyAim,SEAS,seasonInfo,RAIN,JELLY,heronWhimSweep,heronLaserHunt,TOPPLE,spawnJelly};
 })();
 </script>
 </body>
