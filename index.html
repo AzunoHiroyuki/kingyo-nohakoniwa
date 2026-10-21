@@ -6571,10 +6571,26 @@ function jellyOnLine(a,b){
   const out=[];for(const J of JELLY.list){const v=new THREE.Vector3().subVectors(J.pos,a),t=v.dot(d);if(t<0)continue;const q=a.clone().addScaledVector(d,t);if(q.distanceTo(J.pos)<.22)out.push(J);}
   return out;
 }
-function jellySnipe(a,b,aimed){
+// 仲間をねらった相手に、クラゲたちが一斉に向かっていく
+function heronFoe(){return {o:BIRD,kind:'heron',nm:'アオサギ',pos:BIRD.pos,h:.45,r:.03,y:()=>BIRD.pos.y||0};}
+function hunterFoe(H){return {o:H,kind:H===(JH.h)?'jhunter':'human',nm:'猟師',pos:H.pos,h:.6,r:.04,y:()=>groundH(H.pos.x,H.pos.z)+(H.onTower?H.towerH:0)};}
+function jellyAlarm(foe){
+  if(!foe||!JELLY.list.length)return;
+  const was=JELLY.revenge&&JELLY.revenge.h.o===foe.o;JELLY.revenge={h:foe,t:20};
+  for(const J of JELLY.list)J.cd=Math.min(J.cd,R(.6,1.4));
+  if(!was)logEvent('仲間をねらわれたクラゲたちが、'+foe.nm+'に一斉に向かっていきます！','jellyrally','クラゲは仲間が攻撃されると、率先して相手を倒しに向かいます。相手のほうを向いて進むので、正面からの反撃はかわされやすくなります');
+}
+function revengeAlive(){
+  const R0=JELLY.revenge;if(!R0)return false;const o=R0.h.o;
+  if(R0.h.kind==='heron')return BIRD.st!=='away'&&BIRD.st!=='dying';
+  if(R0.h.kind==='jhunter')return JH.h===o&&o.st!=='out';
+  return o.g&&o.g.visible&&o.st!=='away'&&o.st!=='exit';
+}
+function jellySnipe(a,b,aimed,foe){
   const end=a.clone().addScaledVector(new THREE.Vector3().subVectors(b,a).normalize(),7);
   const line=jellyOnLine(a,end);if(!line.length)return 0;
   const hit=line.filter(J=>!jellyFront(J,a));for(const J of line)if(!hit.includes(J))jellyDodge(J,a,'弾');
+  if(foe)jellyAlarm(foe);
   if(!hit.length)return 0;
   for(const J of hit){emitSparkles(J.pos.clone(),24,.1,'bubble');jellyPop(J);JELLY.list.splice(JELLY.list.indexOf(J),1);skGain('jelly',40,'death');}
   JELLY.stings=JELLY.stings.filter(S=>{if(JELLY.list.includes(S.J))return true;scene.remove(S.line);return false;});
@@ -6594,7 +6610,7 @@ function hunterShoot(F,E,dist=0){
   const mz=v1.clone(),ja=jellyAim(mz);
   if(ja){
     logEvent('猟師が、一列に並んだクラゲにねらいを定めました……','jellyaim');gunFX(H,mz,ja);
-    const n=jellySnipe(mz,ja,true),end=mz.clone().addScaledVector(new THREE.Vector3().subVectors(ja,mz).normalize(),7);
+    const n=jellySnipe(mz,ja,true,hunterFoe(H)),end=mz.clone().addScaledVector(new THREE.Vector3().subVectors(ja,mz).normalize(),7);
     const pa=H.tracer.geometry.attributes.position;pa.setXYZ(0,mz.x,mz.y,mz.z);pa.setXYZ(1,end.x,end.y,end.z);pa.needsUpdate=true;H.tracer.visible=true;H.trT=.15;
     return;
   }
@@ -6611,7 +6627,7 @@ function hunterShoot(F,E,dist=0){
     if(victim&&rng()<.55){const q=fighterPos(victim);to=v2.set(q.x,groundH(q.x,q.z)+.4,q.z);logEvent('流れ弾が'+fname(victim)+'に当たってしまいました！','stray','猟銃の弾は、外れると思わぬところへ飛んでいきます');hurtFighter(victim,R(15,25),null);}
     else{to=v2.set(E.pos.x+R(-.5,.5),ey,E.pos.z+R(-.5,.5));addRipple(to.x,to.z,.8);logEvent('猟師の弾は外れました','huntmiss');}
   }
-  jellySnipe(mz,to.clone(),false);   // たまたま射線上にいたクラゲも撃ち抜かれる
+  jellySnipe(mz,to.clone(),false,hunterFoe(H));   // たまたま射線上にいたクラゲも撃ち抜かれる
   const pa=H.tracer.geometry.attributes.position;pa.setXYZ(0,mz.x,mz.y,mz.z);pa.setXYZ(1,to.x,to.y,to.z);pa.needsUpdate=true;H.tracer.visible=true;H.trT=.08;
 }
 function updateHunters(dt){
@@ -8478,6 +8494,7 @@ function heronLaserHunt(){
     if(t.kind==='smoker'){const u=t.o.g.userData;if(u.cig)u.cig.visible=false;t.o.smoking=0;humanLeave(undefined,t.o);logEvent('タバコを吸っていた人に、アオサギがレーザー！あわてて逃げていきました','laserSmoker','アオサギはタバコの煙が大嫌い。喫煙者を見つけると、まっさきにレーザーを撃ちます');}
     else if(t.kind==='jelly'){
       const J=t.o;if(!JELLY.list.includes(J))return;
+      jellyAlarm(heronFoe());
       if(jellyFront(J,BIRD.pos)){jellyDodge(J,BIRD.pos,'レーザー');shieldFX(J);J.cd=Math.min(J.cd,.2);}
       else{
         emitSparkles(J.pos.clone(),26,.1,'bubble');jellyPop(J);JELLY.list.splice(JELLY.list.indexOf(J),1);skGain('jelly',40,'death');
@@ -8498,7 +8515,7 @@ function heronWhimSweep(){
   logEvent('アオサギが気まぐれに、180度ぐるりとレーザーを放ちました！','laserWhim','アオサギはたまに、なんの前ぶれもなく半円を描くようにレーザーを撃ちます。通り道の木はなぎ倒され、草には火がつきます');
 }
 /* ============ 空中を漂うクラゲ：長い触手で離れた相手を刺し、毒を送り込む ============ */
-const JELLY={list:[],stings:[],poison:[]};
+const JELLY={list:[],stings:[],poison:[],revenge:null};
 MAT.jellyBell=new THREE.MeshStandardMaterial({color:'#e07ad0',transparent:true,opacity:.55,roughness:.2,emissive:'#7a2a90',emissiveIntensity:.5,side:THREE.DoubleSide,depthWrite:false});
 MAT.jellyCore=new THREE.MeshBasicMaterial({color:'#ffd0f4',transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false});
 MAT.jellyTent=new THREE.LineBasicMaterial({color:'#d890e8',transparent:true,opacity:.7});
@@ -8559,6 +8576,11 @@ function groundHeron(){
   BIRD.pos.set(x,0,z);BIRD.st='stand';BIRD.t=0;if(heron)heron.g.visible=true;
   logEvent('強くなったクラゲが、空を飛ぶアオサギを撃ち落としました！アオサギはしばらく飛べません','jellyheron','落とされたアオサギは、毒が抜けるまで地上から動けません');
 }
+// クラゲ退治の猟師が刺されると、たまらず逃げ帰る
+function jellyHitHunter(H){
+  if(!H||JH.h!==H||H.st==='out')return;H.stung=(H.stung||0)+1;emitSparkles(v1.set(H.pos.x,.5,H.pos.z),8,.05,'bubble');
+  if(H.stung>=2){H.st='out';H.exit=outerBankPoint();logEvent('クラゲの群れに反撃され、猟師がたまらず逃げ帰りました！','jhunterflee','仲間をねらわれたクラゲたちは、一斉に襲いかかります');}
+}
 function venomSpd(o){return o.sleepT>0?0:o.slowT>0?.35:1;}
 // 正面判定：攻撃がクラゲの正面（目のある側 ±65°）から来たら、すべてかわす
 function jellyFront(J,from){const dx=from.x-J.pos.x,dz=from.z-J.pos.z,d=Math.hypot(dx,dz)||1;return (Math.sin(J.yaw||0)*dx+Math.cos(J.yaw||0)*dz)/d>Math.cos(65*Math.PI/180);}
@@ -8595,9 +8617,11 @@ function updateJelly(dt){
   const W=P.pondW,L=P.pondL,M=M_BANK,tt=U.uTime.value;
   for(const J of JELLY.list){
     // ふわふわ漂う（縁で向きを変える）
+    // 仲間をねらった相手がいれば、そちらへ向かう（正面を向けて進む）
+    if(JELLY.revenge){const tp=JELLY.revenge.h.pos,dx=tp.x-J.pos.x,dz=tp.z-J.pos.z,d=Math.hypot(dx,dz);if(d>.9){J.vel.x=lerp(J.vel.x,dx/d*.35,Math.min(1,dt*2));J.vel.z=lerp(J.vel.z,dz/d*.35,Math.min(1,dt*2));}else J.vel.multiplyScalar(Math.max(0,1-dt*3));}
     J.pos.addScaledVector(J.vel,dt);J.ph+=dt;
     if(J.pos.x<-W/2-M+.2||J.pos.x>W/2+M-.2)J.vel.x*=-1;if(J.pos.z<-L/2-M+.2||J.pos.z>L/2-.2)J.vel.z*=-1;
-    if(rng()<dt*.2){J.vel.x+=R(-.03,.03);J.vel.z+=R(-.03,.03);J.vel.clampLength(0,.12);}
+    if(!JELLY.revenge&&rng()<dt*.2){J.vel.x+=R(-.03,.03);J.vel.z+=R(-.03,.03);J.vel.clampLength(0,.12);}
     J.pos.y=J.h0+Math.sin(J.ph*.8)*.08;
     // 進む方向へゆっくり向きを変える（正面＝目のある側）
     if(J.yaw===undefined)J.yaw=R(0,6.28);
@@ -8615,7 +8639,8 @@ function updateJelly(dt){
       pa.needsUpdate=true;});
     // 長距離の刺突
     if((J.cd-=dt)<=0){
-      J.cd=R(4,8);const ts=jellyTargets(J);
+      J.cd=JELLY.revenge?R(1.2,2.2):R(4,8);let ts=jellyTargets(J);
+      if(JELLY.revenge){const rh=JELLY.revenge.h;if(Math.hypot(rh.pos.x-J.pos.x,rh.pos.z-J.pos.z)<jellyRange())ts=[{h:rh,p:()=>new THREE.Vector3(rh.pos.x,rh.y()+rh.h*.6,rh.pos.z),d:0}];}
       const n=Math.min(ts.length,1+skLv('jelly','tent'));ts.sort(()=>rng()-.5);
       for(const t of ts.slice(0,n)){const geo=new THREE.BufferGeometry().setFromPoints([J.pos.clone(),J.pos.clone()]);const line=new THREE.Line(geo,MAT.jellySting);line.frustumCulled=false;scene.add(line);JELLY.stings.push({J,t,line,k:0,hit:false});}
     }
@@ -8625,7 +8650,7 @@ function updateJelly(dt){
     const S=JELLY.stings[i];S.k+=dt;const from=v1.copy(S.J.pos);from.y-=.05;
     const to=S.t.p(),ext=S.k<.3?S.k/.3:S.k<.6?1:Math.max(0,1-(S.k-.6)/.25);
     const pa=S.line.geometry.attributes.position;pa.setXYZ(0,from.x,from.y,from.z);pa.setXYZ(1,lerp(from.x,to.x,ext),lerp(from.y,to.y,ext),lerp(from.z,to.z,ext));pa.needsUpdate=true;
-    if(S.k>=.3&&!S.hit){S.hit=true;jellyPoison(S.t.h);skGain('jelly',5,'hit');emitSparkles(to,8,.05,'bubble');}
+    if(S.k>=.3&&!S.hit){S.hit=true;if(S.t.h.kind==='jhunter')jellyHitHunter(S.t.h.o);else jellyPoison(S.t.h);skGain('jelly',5,'hit');emitSparkles(to,8,.05,'bubble');}
     if(S.k>=.85||!JELLY.list.includes(S.J)){scene.remove(S.line);S.line.geometry.dispose();JELLY.stings.splice(i,1);}
   }
   // 毒の効果
@@ -8652,6 +8677,7 @@ function updateJelly(dt){
       o.slowT=0;o.sleepT=0;JELLY.poison.splice(i,1);
     }
   }
+  if(JELLY.revenge&&((JELLY.revenge.t-=dt)<=0||!revengeAlive()||!JELLY.list.length)){JELLY.revenge=null;}
   for(const J of JELLY.list)skGain('jelly',dt*.1,'live');
   if(BIRD.grounded>0){BIRD.grounded-=dt;if(BIRD.grounded<=0)logEvent('毒が抜けて、アオサギがまた飛べるようになりました','heronfly');}
 }
@@ -8700,7 +8726,7 @@ function updateJellyHunter(dt){
         const aimP=bestJellyLine(mz)||tgt.pos.clone(),end=mz.clone().addScaledVector(new THREE.Vector3().subVectors(aimP,mz).normalize(),7);
         H.yaw=Math.atan2(aimP.x-H.pos.x,aimP.z-H.pos.z);
         gunFX(H,mz,aimP);H.shots++;
-        if(!jellySnipe(mz,aimP,true))logEvent('猟師の弾はクラゲをかすめました','jhuntmiss');
+        if(!jellySnipe(mz,aimP,true,hunterFoe(H)))logEvent('猟師の弾はクラゲをかすめました','jhuntmiss');
         const pa=H.tracer.geometry.attributes.position;pa.setXYZ(0,mz.x,mz.y,mz.z);pa.setXYZ(1,end.x,end.y,end.z);pa.needsUpdate=true;H.tracer.visible=true;H.trT=.12;
       }
     }
