@@ -7113,7 +7113,7 @@ const SKE={bear:1,lion:1,elephant:1,giraffe:1,croc:1};   // エネミー（敵�
 function skIsEnemy(t){return !!SKE[t];}
 const SKILLS=[
   {id:'hp',tier:1,max:Infinity},{id:'atk',tier:1,max:Infinity},{id:'spd',tier:1,max:Infinity},{id:'eggs',tier:1,max:Infinity,only:'fish'},   // 強化系はポイントがある限り上げられる
-  {id:'drain',tier:2,max:5,req:['atk',2]},{id:'anchor',tier:2,max:5,req:['atk',1],only:'human'},{id:'boat',tier:2,max:5,req:['spd',1],only:'human'},{id:'buster',tier:2,max:5,req:['atk',2],only:'crow'},{id:'ally',tier:2,max:3,maxBy:{crow:5},req:['hp',2]},{id:'guard',tier:2,max:5,req:['spd',2]},
+  {id:'drain',tier:2,max:5,req:['atk',2]},{id:'anchor',tier:2,max:5,req:['atk',1],only:'human'},{id:'boat',tier:2,max:5,req:['spd',1],only:'human'},{id:'buster',tier:2,max:5,req:['atk',2],only:'crow'},{id:'sweep',tier:2,max:5,req:['atk',2],only:'heron'},{id:'ally',tier:2,max:3,maxBy:{crow:5},req:['hp',2]},{id:'guard',tier:2,max:5,req:['spd',2]},
   {id:'uniq',tier:3,max:3,req:'tier2'}
 ];
 // 側ごとのスキル名と効果
@@ -7129,7 +7129,7 @@ const SKN={
   crow:{hp:['体力強化','戦いでの最大体力 +12%／段'],atk:['嘴の力','与えるダメージ +10%／段'],spd:['翼の力','スタミナ回復 +8%／段'],
     drain:['吸収','与えたダメージの6%／段ぶん体力を回復'],ally:['群れ呼び','やって来る群れ +1羽／段（カラスだけ最大5段）'],buster:['ブレーンバスター','敵を高く持ち上げて地面に叩き落とす。ダメージは攻撃力しだい。段が上がるほど高く持ち上げて大ダメージ'],guard:['頑丈','受けるダメージ -7%／段'],uniq:['集団戦法','ダメージがさらに +15%／段']},
   heron:{hp:['体力強化','戦いでの最大体力 +12%／段'],atk:['嘴の鋭さ','与えるダメージ +10%／段'],spd:['翼の力','スタミナ回復 +8%／段'],
-    drain:['吸収','与えたダメージの6%／段ぶん体力を回復'],ally:['呼び声','戦いの中でカラスの群れを呼べる回数 +1／段'],guard:['頑丈','受けるダメージ -7%／段'],uniq:['一撃の嘴','10%／段 の確率でダメージ2倍']},
+    drain:['吸収','与えたダメージの6%／段ぶん体力を回復'],ally:['呼び声','戦いの中でカラスの群れを呼べる回数 +1／段'],sweep:['ロングレーザー薙ぎ払い','戦いの中で長いレーザーを横に薙ぎ払い、当たった敵すべてにダメージ。通り道に火がつく。段が上がるほど長く・広く・強く・頻繁に'],guard:['頑丈','受けるダメージ -7%／段'],uniq:['一撃の嘴','10%／段 の確率でダメージ2倍']},
   ant:{hp:['生命力','食べられそうなときに逃れる確率 +5%／段'],atk:['大顎','侵入者を仕留める確率 +20%／段'],spd:['脚力','歩く速さ +6%／段'],
     drain:['女王の多産','卵を産む速さ +15%／段'],ally:['働きアリ','巣に集める食べ物 +15%／段'],guard:['硬い外骨格','逃れる確率 +6%／段'],uniq:['酸の噴射','食べた相手が酸で弱る']},
   mole:{hp:['生命力','食べられそうなときに逃れる確率 +5%／段'],atk:['鋭い爪','食事の栄養 +15%／段'],spd:['足の速さ','地上を歩く速さ +6%／段'],
@@ -7194,7 +7194,7 @@ function updateBirdTeam(dt){
   if(BTL.team&&!BTL.teamLogged){BTL.teamLogged=true;logEvent('カラスとアオサギがチームを組みました！息を合わせて攻撃が強くなります','teamup','チームを組んでいるあいだ、カラスとアオサギの攻撃は2割増しになります');}
 }
 function skAntStore(){return 1+.15*skLv('ant','ally');}
-const AUTO_ORDER=['atk','hp','spd','eggs','anchor','boat','buster','atk','hp','drain','ally','anchor','ally','ally','guard','uniq','drain','spd','uniq','guard','atk','hp','drain','ally','uniq','spd','guard','atk','hp','drain','ally','guard','spd','drain','guard'];
+const AUTO_ORDER=['atk','hp','spd','eggs','anchor','boat','buster','sweep','atk','hp','drain','ally','anchor','ally','ally','guard','uniq','drain','spd','uniq','guard','atk','hp','drain','ally','uniq','spd','guard','atk','hp','drain','ally','guard','spd','drain','guard'];
 const SK=(()=>{
   const d={};for(const t in SKT)d[t]={xp:0,used:{},auto:true,deaths:0,kills:0};
   try{const s=JSON.parse(localStorage.getItem('kingyo-skill-v2')||'null');if(s)for(const t in SKT)if(s[t])Object.assign(d[t],s[t]);}catch(e){}
@@ -8094,6 +8094,63 @@ function updateBeams(dt){
     BEAM.petCd=1;
   }
 }
+/* ============ アオサギのスキル：ロングレーザー薙ぎ払い ============ */
+const SWEEP={on:null,cd:6,g:null};
+function sweepMesh(){
+  if(SWEEP.g)return SWEEP.g;
+  const g=new THREE.Group();
+  const o=new THREE.Mesh(BEAM_GEO,MAT.beamOuter.clone());o.scale.set(.028,1,.028);g.add(o);
+  const c=new THREE.Mesh(BEAM_GEO,MAT.beamCore.clone());c.scale.set(.011,1,.011);g.add(c);
+  g.renderOrder=30;g.visible=false;scene.add(g);g.userData={o,c};SWEEP.g=g;return g;
+}
+function sweepEnemies(){const out=[];for(const B of BTL.zoo)if(B.state!=='dead')out.push({o:B,r:.06*B.S.scale*(B.sz||1),nm:B.nm});if(BTL.croc&&!BTL.crocOut)out.push({o:BTL.croc,r:.08*BTL.croc.len,nm:'ワニ'});return out;}
+function startSweep(F,E){
+  const lv=skLv('heron','sweep'),mid=Math.atan2(E.pos.x-BIRD.pos.x,E.pos.z-BIRD.pos.z),half=.9+.08*lv;
+  SWEEP.on={F,lv,t:0,dur:1.3,a0:mid-half,a1:mid+half,len:2.4+.35*lv,hit:new Set(),fireT:0,fires:0};
+  if(rng()<.5){const s=SWEEP.on;[s.a0,s.a1]=[s.a1,s.a0];}
+  logEvent('アオサギのロングレーザー薙ぎ払い！長い光線が戦場を横一文字に焼き払います！','sweep','スキル「ロングレーザー薙ぎ払い」：長い光線を横に薙ぎ払い、当たった敵すべてにダメージを与えます。通り道の燃えるものには火がつきます。段が上がるほど長く、広く、強くなります');
+}
+function updateSweep(dt){
+  const S=SWEEP.on;
+  if(!S){
+    if(!BTL.on||!heron||BIRD.st==='away'||!skLv('heron','sweep'))return;
+    const F=BTL.f.find(f=>f.kind==='heron');if(!F)return;
+    if((SWEEP.cd-=dt)>0)return;
+    const E=F.enemy||(BTL.croc&&!BTL.crocOut?BTL.croc:fightingBeasts()[0]);
+    if(!E||!E.pos||Math.hypot(E.pos.x-BIRD.pos.x,E.pos.z-BIRD.pos.z)>2.6)return;
+    SWEEP.cd=Math.max(6,15-1.6*skLv('heron','sweep'));startSweep(F,E);return;
+  }
+  if(BIRD.st==='away'||!heron||!heron.g.visible){if(SWEEP.g)SWEEP.g.visible=false;SWEEP.on=null;return;}   // アオサギがいなくなったら止まる
+  const g=sweepMesh();S.t+=dt;const k=Math.min(1,S.t/S.dur),a=lerp(S.a0,S.a1,k*k*(3-2*k));
+  const from=beakTip();
+  // 光線の先は地面（水面）まで届く
+  const ex=BIRD.pos.x+Math.sin(a)*S.len,ez=BIRD.pos.z+Math.cos(a)*S.len,ey=inWaterAt(ex,ez)?U.uWaterY.value:groundH(ex,ez);
+  const to=new THREE.Vector3(ex,ey,ez),dir=new THREE.Vector3().subVectors(to,from),len=dir.length();
+  g.visible=true;g.position.copy(from).addScaledVector(dir,.5);g.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());g.scale.set(1,len,1);
+  const fl=.75+.25*Math.sin(S.t*40);g.userData.o.material.opacity=.8*fl;g.userData.c.material.opacity=.95;
+  BIRD.yaw=a;
+  // 光線上の敵にダメージ（1回の薙ぎ払いで1体につき1回）
+  const px=BIRD.pos.x,pz=BIRD.pos.z,lx=ex-px,lz=ez-pz,L2=lx*lx+lz*lz;
+  for(const e of sweepEnemies()){
+    if(S.hit.has(e.o))continue;
+    const t=clamp(((e.o.pos.x-px)*lx+(e.o.pos.z-pz)*lz)/L2,0,1),cx=px+lx*t,cz=pz+lz*t;
+    if(Math.hypot(e.o.pos.x-cx,e.o.pos.z-cz)<e.r+.08){
+      S.hit.add(e.o);const dmg=R(25,40)*skFAtk(S.F)*(1+.2*S.lv);
+      if(e.o.maxHp===undefined){e.o.maxHp=160*(e.o.len||1);e.o.hp=e.o.maxHp;}
+      e.o.hp=Math.max(0,e.o.hp-skTake(e.o,dmg));e.o.flash=.5;skDealt(S.F,dmg);
+      emitSparkles(v1.set(e.o.pos.x,(e.o.y||0)+.2,e.o.pos.z),20,.1,'dirt');
+      logEvent('薙ぎ払いのレーザーが'+e.nm+'を焼き、'+Math.round(dmg)+'のダメージ！','sweephit');
+    }
+  }
+  // 通り道に火をつける（燃えるものの上だけ）
+  if((S.fireT-=dt)<=0&&S.fires<10){
+    S.fireT=.09;const q=R(.4,1),fx=px+lx*q,fz=pz+lz*q;
+    if(canBurn(fx,fz)){igniteCell(fx,fz);S.fires++;statsDirty=true;}
+    else if(inWaterAt(fx,fz))emitSparkles(v2.set(fx,U.uWaterY.value,fz),4,.05,'bubble');
+  }
+  if(rng()<dt*30)emitSparkles(to.clone(),3,.05,'dirt');
+  if(k>=1){g.visible=false;if(S.fires)logEvent('薙ぎ払われた跡に、点々と火の手が上がっています','sweepfire');SWEEP.on=null;}
+}
 function updateInvasives(dt){
   const ed=P.eco?dt*P.ecoSpeed:0,tt=U.uTime.value,D=P.pondD;
   for(const [k,init,cap] of [['cray',[0,2,5][P.cray]||0,[0,14,28][P.cray]||0],['bass',[0,1,2][P.bass]||0,[0,6,12][P.bass]||0]]){
@@ -8970,7 +9027,7 @@ function frame(now){
   applyTime();
   for(const f of fishes)f.update(dt);
   for(let i=fishes.length-1;i>=0;i--)if(fishes[i].gone)fishes.splice(i,1);
-  updateDays(dt);updateDrought(dt);updateFloodEvent(dt);updateFloodSwim(dt);updateBoats(dt);updateOverflow(dt);updateTerrain(dt);updateMud(dt);updateBirdPop(dt);updateAnglers(dt);updateEggs(dt);updatePlants(dt);updateLandPlants(dt);updateFeeder(dt);updateBird(dt);updateBugs(dt);updateProj(dt);updateCrits(dt);updateWeasel(dt);updateMoles(dt);updateNuts(dt);updateCat(dt);updateDog(dt);updateRain(dt);updateCrows(dt);updateAnts(dt);updateInvasives(dt);updateHera(dt);updateGeneParasite(dt);updateHuman(dt);updateAntArrivals(dt);updateRiver(dt);updateRefuge(dt);updateCrocs(dt);updateBattle(dt);updateSwallow(dt);updateButts(dt);updateFire(dt);updateSmoke(dt);updatePoacher(dt);updatePassengers(dt);updateSkills(dt);updateGreat(dt);updateWaves(dt);updateBuster(dt);updateTreeAging(dt);updateProj(dt);updateBeams(dt);updateEdgeFall(dt);if((COVER.t-=dt)<0){COVER.t=.5;COVER.pts=collectCover();}
+  updateDays(dt);updateDrought(dt);updateFloodEvent(dt);updateFloodSwim(dt);updateBoats(dt);updateOverflow(dt);updateTerrain(dt);updateMud(dt);updateBirdPop(dt);updateAnglers(dt);updateEggs(dt);updatePlants(dt);updateLandPlants(dt);updateFeeder(dt);updateBird(dt);updateBugs(dt);updateProj(dt);updateCrits(dt);updateWeasel(dt);updateMoles(dt);updateNuts(dt);updateCat(dt);updateDog(dt);updateRain(dt);updateCrows(dt);updateAnts(dt);updateInvasives(dt);updateHera(dt);updateGeneParasite(dt);updateHuman(dt);updateAntArrivals(dt);updateRiver(dt);updateRefuge(dt);updateCrocs(dt);updateBattle(dt);updateSwallow(dt);updateButts(dt);updateFire(dt);updateSmoke(dt);updatePoacher(dt);updatePassengers(dt);updateSkills(dt);updateGreat(dt);updateWaves(dt);updateBuster(dt);updateTreeAging(dt);updateProj(dt);updateBeams(dt);updateSweep(dt);updateEdgeFall(dt);if((COVER.t-=dt)<0){COVER.t=.5;COVER.pts=collectCover();}
   updateFood(dt);updateSparkles(dt);updateStats(dt);
   const tt=U.uTime.value;
   for(const l of ENV.lilyList){l.m.position.y=l.y+(U.uWaterY.value+.05)+Math.sin(tt*.8+l.ph)*.0015;l.m.rotation.y+=Math.sin(tt*.3+l.ph)*.0003;}
@@ -8993,7 +9050,7 @@ function frame(now){
 requestAnimationFrame(frame);
 // 確認用：画面が隠れていても時間を進められる（__step(コマ数)）
 window.__step=n=>{frame.manual=true;let t=performance.now();for(let i=0;i<n;i++){t+=33;frame(t);}frame.manual=false;last=performance.now();};
-window.__hako={P,fishes,scene,renderer,camera,controls,ECO,Fish,BIRD,startBirdArrive,infectRandom,BUGS,CRIT,WEASEL,startWeasel,MOLE,infectFluke,breachPond,flood3From,isWet3,PET,NUT,FLOOD,startCat,startDog,shakeTree,RAIN,makeOak,CROWS,startCrows,LANDP,ANTS,INV,addInv,gcSeed,gcEat,gcAcquire,gcCount,GC_SRC,HUMAN,startHuman,ANTV,makeKaki,addPetKid,petFamilyArrive,RIVER,inRiver,DRY,sizeRisk,ANG,startAnglers,HER,CRW,OVF,TERR,groundH,HERA,addHera,FLOODEV,startFloodEvent,HIGHW,startHighWater,FSW,BOATS,startBoat,CROC,startCroc,BTL,startBattle,summonBeast,MUD,mudF,updateMud,updateBattle,fightingBeasts,FIRE,startFire,BUTTS,HK,poacherRelease,earnPelt,summonHunter,HUNT,PASS,acidSwallow,broodLay,crisisLevel,INV,fishes,SK,skGain,skLv,openSkills,skTotal,CRIT,killCrit,gcEat,BIRD,sinkBoat,CROWS,crowAggroTarget,crowPower,FALL,PET,GREAT,startGreatDry,startGreatFlood,startWave,WAVE,applyWaterLevel,BUSTER,busterStart,NUT,treeTrunks,ENV,WOOD,FAC,facJob,growExp,skEType,ANTS,MOLE,antHosts,HPROJ,HSTYLE,BEAM,heronBeam,startBirdArrive};
+window.__hako={P,fishes,scene,renderer,camera,controls,ECO,Fish,BIRD,startBirdArrive,infectRandom,BUGS,CRIT,WEASEL,startWeasel,MOLE,infectFluke,breachPond,flood3From,isWet3,PET,NUT,FLOOD,startCat,startDog,shakeTree,RAIN,makeOak,CROWS,startCrows,LANDP,ANTS,INV,addInv,gcSeed,gcEat,gcAcquire,gcCount,GC_SRC,HUMAN,startHuman,ANTV,makeKaki,addPetKid,petFamilyArrive,RIVER,inRiver,DRY,sizeRisk,ANG,startAnglers,HER,CRW,OVF,TERR,groundH,HERA,addHera,FLOODEV,startFloodEvent,HIGHW,startHighWater,FSW,BOATS,startBoat,CROC,startCroc,BTL,startBattle,summonBeast,MUD,mudF,updateMud,updateBattle,fightingBeasts,FIRE,startFire,BUTTS,HK,poacherRelease,earnPelt,summonHunter,HUNT,PASS,acidSwallow,broodLay,crisisLevel,INV,fishes,SK,skGain,skLv,openSkills,skTotal,CRIT,killCrit,gcEat,BIRD,sinkBoat,CROWS,crowAggroTarget,crowPower,FALL,PET,GREAT,startGreatDry,startGreatFlood,startWave,WAVE,applyWaterLevel,BUSTER,busterStart,NUT,treeTrunks,ENV,WOOD,FAC,facJob,growExp,skEType,ANTS,MOLE,antHosts,HPROJ,HSTYLE,BEAM,heronBeam,startBirdArrive,SWEEP};
 })();
 </script>
 </body>
